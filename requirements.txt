@@ -5,3 +5,5 @@ pydantic
 docxtpl
 python-docx
 openpyxl
+psycopg2-binary
+dj-database-url
