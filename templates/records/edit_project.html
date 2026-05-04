@@ -1,0 +1,330 @@
+{% extends "records/base.html" %}
+{% block title %}Edit {{ project.project_name }} — Office Records{% endblock %}
+{% block page_title %}Edit Project{% endblock %}
+{% block page_sub %}Update project metadata for #{{ project.project_id }}{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'records:project_detail' project.project_id %}" class="btn btn-secondary">← Back to Project</a>
+{% endblock %}
+
+{% block content %}
+<style>
+  .form-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 24px; margin-bottom: 24px; }
+  .form-section-title { font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: var(--text-muted); }
+  .form-control { width: 100%; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; color: var(--text-primary); font-family: 'Inter', sans-serif; transition: border-color 0.2s; }
+  .form-control:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(88,166,255,0.2); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; padding: 8px 16px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500; cursor: pointer; transition: 0.2s; border: 1px solid transparent; }
+  .btn-primary { background: var(--accent-blue); color: #fff; }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-secondary { background: var(--bg-secondary); color: var(--text-primary); border-color: var(--border); }
+  .btn-secondary:hover { background: var(--border); }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+  th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 14px; }
+  th { font-weight: 600; color: var(--text-muted); }
+  .remove-btn { background: none; border: none; color: #f85149; cursor: pointer; font-size: 16px; padding: 4px; border-radius: 4px; }
+  .remove-btn:hover { background: rgba(248,81,73,0.1); }
+  .emp-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 12px; }
+  .skill-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+</style>
+
+<div class="form-section">
+  <div class="form-section-title">1. Basic Details</div>
+  <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:16px">
+    <div class="form-group">
+      <label>Project Name</label>
+      <input type="text" id="p_name" class="form-control" value="{{ project.project_name }}">
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="p_status" class="form-control">
+        <option value="Active" {% if project.status == 'Active' %}selected{% endif %}>Active</option>
+        <option value="Completed" {% if project.status == 'Completed' %}selected{% endif %}>Completed</option>
+        <option value="On Hold" {% if project.status == 'On Hold' %}selected{% endif %}>On Hold</option>
+        <option value="Cancelled" {% if project.status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Project Manager(s) <span style="font-weight:normal;color:var(--text-muted);font-size:11px;">(Hold Ctrl)</span></label>
+      <select id="p_manager" class="form-control" multiple style="height: 80px;" required>
+        {% for e in employees %}
+        <option value="{{ e.emp_id }}" {% if e.emp_id in project.get_manager_ids_list %}selected{% endif %}>{{ e.emp_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="form-group">
+    <label>Description</label>
+    <textarea id="p_desc" class="form-control" rows="3">{{ project.description }}</textarea>
+  </div>
+  <div class="form-group">
+    <label>Tech Stack</label>
+    <input type="text" id="p_tech_stack" class="form-control" value="{{ current_tech_stack }}">
+  </div>
+</div>
+
+<div class="form-section">
+  <div class="form-section-title">2. Edit Team</div>
+  <div style="display:flex;gap:12px;align-items:flex-end">
+    <div class="form-group" style="flex:1;margin-bottom:0">
+      <label>Search Employee</label>
+      <input type="text" list="emp_list" id="emp_search" class="form-control" placeholder="Start typing a name..." autocomplete="off">
+      <datalist id="emp_list">
+        <!-- Fetched via api_get_employees -->
+      </datalist>
+    </div>
+    <div class="form-group" style="flex:1;margin-bottom:0">
+      <label>Role</label>
+      <input type="text" id="emp_role" class="form-control" placeholder="e.g. Backend Developer">
+    </div>
+    <div class="form-group" style="width:120px;margin-bottom:0">
+      <label>Utilization %</label>
+      <input type="number" id="emp_utilization" class="form-control" placeholder="50" min="0" max="100" step="1">
+    </div>
+    <button type="button" class="btn btn-secondary" onclick="addEmployee()" style="height:41px;padding:0 24px">➕ Add</button>
+  </div>
+  
+  <div id="team_grid" style="margin-top:20px; display:flex; flex-direction:column; gap:12px;"></div>
+</div>
+
+<div style="display:flex; justify-content:flex-end; margin-bottom:48px;">
+  <button id="saveBtn" type="button" class="btn btn-primary" onclick="gatherAndSave()" style="padding:12px 32px; font-weight:600;">💾 Save Changes</button>
+</div>
+
+<script>
+  let team = [];
+  let employees_data_source = [];
+  const project_id = "{{ project.project_id }}";
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      const empRes = await fetch('/api/employees/');
+      employees_data_source = await empRes.json();
+      populateEmployeeDataList();
+
+      const teamRes = await fetch(`/api/projects/${project_id}/team/`);
+      team = await teamRes.json();
+      renderTeam();
+    } catch (e) {
+      console.error("Failed to fetch initial data.", e);
+    }
+  });
+
+  function populateEmployeeDataList() {
+    const dataList = document.getElementById('emp_list');
+    dataList.innerHTML = '';
+    employees_data_source.forEach(e => {
+        const opt = document.createElement('option');
+        opt.dataset.id = e.emp_id;
+        opt.dataset.name = e.emp_name;
+        opt.dataset.util = e.total_utilization || 0;
+        opt.value = `${e.emp_name} (${e.designation || ''})`;
+        dataList.appendChild(opt);
+    });
+  }
+
+  function addEmployee() {
+    const searchInput = document.getElementById('emp_search');
+    const roleInput = document.getElementById('emp_role');
+    const utilizationInput = document.getElementById('emp_utilization');
+    const role = roleInput.value.trim();
+    const utilization = parseFloat(utilizationInput.value) || 0;
+    const val = searchInput.value;
+
+    const list = document.getElementById('emp_list');
+    let empId = null;
+    let empName = null;
+    let baseUtil = 0;
+    for (let opt of list.options) {
+      if (opt.value === val) {
+        empId = opt.dataset.id;
+        empName = opt.dataset.name;
+        baseUtil = parseFloat(opt.dataset.util) || 0;
+        break;
+      }
+    }
+
+    if (!empId || !role) {
+      alert('Please select a valid employee from the search list and specify their role.');
+      return;
+    }
+    if (team.some(t => t.emp_id == empId)) {
+      alert('Employee is already assigned to this project.');
+      return;
+    }
+
+    team.push({ emp_id: parseInt(empId), emp_name: empName, role: role, summary: '', utilization: utilization, base_util: baseUtil, skills: [] });
+    searchInput.value = '';
+    roleInput.value = '';
+    utilizationInput.value = '';
+    renderTeam();
+  }
+
+  function removeEmployee(id) {
+    team = team.filter(t => t.emp_id !== id);
+    renderTeam();
+  }
+
+  function updateRole(id, val) {
+    const mem = team.find(t => t.emp_id === id);
+    if(mem) mem.role = val;
+  }
+
+  function updateSummary(id, val) {
+    const mem = team.find(t => t.emp_id === id);
+    if(mem) mem.summary = val;
+  }
+
+  function updateUtilization(id, val) {
+    const mem = team.find(t => t.emp_id === id);
+    if(mem) { mem.utilization = parseFloat(val) || 0; renderTeam(); }
+  }
+
+  function renderTeam() {
+    const grid = document.getElementById('team_grid');
+    grid.innerHTML = '';
+    if (team.length === 0) {
+      grid.innerHTML = '<div style="color:var(--text-muted);font-size:14px;padding:12px;text-align:center;">No team members added yet.</div>';
+      return;
+    }
+    
+    team.forEach((t) => {
+      let skillsHtml = '';
+      if(t.skills && t.skills.length > 0) {
+        t.skills.forEach((s, sIndex) => {
+          skillsHtml += `
+            <div class="skill-row">
+              <input type="text" class="form-control" style="flex:2" value="${s.skill_name.replace(/"/g, '&quot;')}" onchange="updateSkillName(${t.emp_id}, ${sIndex}, this.value)" placeholder="Skill Name">
+              <input type="number" class="form-control" style="flex:1" step="0.1" min="1" max="5" value="${s.rating}" onchange="updateSkillRating(${t.emp_id}, ${sIndex}, this.value)">
+              <button class="remove-btn" onclick="removeSkill(${t.emp_id}, ${sIndex})">✕</button>
+            </div>
+          `;
+        });
+      }
+      
+      const card = document.createElement('div');
+      card.className = 'emp-card';
+      const expectedTotal = (t.base_util||0) + (t.utilization||0);
+      const utilColor = expectedTotal < 25 ? 'var(--accent-red)' : expectedTotal <= 50 ? '#e3a008' : '#3fb950';
+      card.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--border); padding-bottom:8px;">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <strong style="font-size:15px;color:var(--text-primary)">${t.emp_name}</strong>
+            <span style="font-size:12px;color:var(--text-muted)">Current Util: ${t.base_util||0}%</span>
+            <span style="font-size:12px;font-weight:700;color:${utilColor};background:rgba(88,166,255,0.1);padding:2px 8px;border-radius:4px;border:1px solid rgba(88,166,255,0.3)">Expected Total: ${expectedTotal}%</span>
+          </div>
+          <button class="remove-btn" onclick="removeEmployee(${t.emp_id})" style="font-size:13px; font-weight:600;">Remove Member</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 120px;gap:12px;">
+          <div>
+            <label style="font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:4px; display:block;">Role</label>
+            <input type="text" class="form-control" value="${t.role.replace(/"/g, '&quot;')}" onchange="updateRole(${t.emp_id}, this.value)">
+          </div>
+          <div>
+            <label style="font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:4px; display:block;">Project Util %</label>
+            <input type="number" class="form-control" min="0" max="100" step="1" value="${t.utilization||0}" onchange="updateUtilization(${t.emp_id}, this.value)">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:4px; display:block;">Work Summary</label>
+          <textarea class="form-control" rows="3" onchange="updateSummary(${t.emp_id}, this.value)" placeholder="Enter work summary...">${t.summary}</textarea>
+        </div>
+        <div style="background:var(--bg-card); border-radius:var(--radius-sm); border:1px dashed var(--border); padding:12px;">
+          <div style="font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+             <span>Skills Evaluated (Rate 1.0 - 5.0)</span>
+             <button type="button" class="btn btn-secondary" onclick="addSkill(${t.emp_id})" style="font-size:11px; padding:4px 8px;">➕ Add Skill</button>
+          </div>
+          ${skillsHtml}
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  function addSkill(empId) {
+    const mem = team.find(t => t.emp_id === empId);
+    if(mem) {
+        if(!mem.skills) mem.skills = [];
+        mem.skills.push({ skill_name: '', rating: 3.0 });
+        renderTeam();
+    }
+  }
+
+  function removeSkill(empId, skillIndex) {
+    const mem = team.find(t => t.emp_id === empId);
+    if(mem && mem.skills) {
+        mem.skills.splice(skillIndex, 1);
+        renderTeam();
+    }
+  }
+
+  function updateSkillName(empId, skillIndex, val) {
+    const mem = team.find(t => t.emp_id === empId);
+    if(mem && mem.skills && mem.skills[skillIndex]) {
+        mem.skills[skillIndex].skill_name = val;
+    }
+  }
+
+  function updateSkillRating(empId, skillIndex, val) {
+    const mem = team.find(t => t.emp_id === empId);
+    if(mem && mem.skills && mem.skills[skillIndex]) {
+        mem.skills[skillIndex].rating = parseFloat(val);
+    }
+  }
+
+  async function gatherAndSave() {
+    const p_name = document.getElementById('p_name').value.trim();
+    const p_desc = document.getElementById('p_desc').value.trim();
+    const p_status = document.getElementById('p_status').value;
+    const managerSelect = document.getElementById('p_manager');
+    const p_managers = Array.from(managerSelect.selectedOptions).map(o => o.value);
+    const tech_stack_str = document.getElementById('p_tech_stack').value;
+    const tech_stack = tech_stack_str.split(',').map(s=>s.trim()).filter(s=>s);
+
+    if (p_managers.length === 0) {
+      alert("Please select at least one Project Manager.");
+      return;
+    }
+    if (!p_name) { alert("Project name is required."); return; }
+
+    const payload = {
+      project_name: p_name,
+      description: p_desc,
+      status: p_status,
+      manager_ids: p_managers,
+      tech_stack: tech_stack,
+      employees: team
+    };
+
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    try {
+      const csrfToken = '{{ csrf_token }}';
+      const res = await fetch("{% url 'records:edit_project' project.project_id %}", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        window.location.href = "{% url 'records:project_detail' project.project_id %}";
+      } else {
+        alert("Error saving: " + data.error);
+        btn.disabled = false;
+        btn.textContent = '💾 Save Changes';
+      }
+    } catch (err) {
+      console.error(err);
+      alert("An error occurred while saving the project.");
+      btn.disabled = false;
+      btn.textContent = '💾 Save Changes';
+    }
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,7 @@
+django
+python-dotenv
+google-genai
+pydantic
+docxtpl
+python-docx
+openpyxl

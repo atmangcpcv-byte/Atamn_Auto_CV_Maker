@@ -1,0 +1,540 @@
+{% extends "records/base.html" %}
+{% block title %}Employees — Office Records{% endblock %}
+{% block page_title %}Employees{% endblock %}
+{% block page_sub %}{{ employees|length }} employee{{ employees|length|pluralize }} found{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'records:dashboard' %}" class="btn btn-secondary">← Dashboard</a>
+{% if user_iam == 'HR' %}
+<a href="{% url 'records:add_employee' %}" class="btn btn-primary">＋ Add Employee</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Search & Filter Bar ────────────────────────────── -->
+<div class="smart-search-container">
+
+  <!-- Live search row -->
+  <div class="smart-search-row">
+    <div class="smart-search-wrap" id="smartSearchWrap">
+      <svg class="smart-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input
+        type="text"
+        id="liveSearch"
+        class="smart-search-input"
+        placeholder="Search employees… (name, email, designation)"
+        autocomplete="off"
+        spellcheck="false"
+        value="{{ search }}"
+      />
+      <div class="smart-search-meta" id="searchMeta"></div>
+      <button class="smart-search-clear" id="clearSearch" title="Clear search" style="display:none">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <kbd class="smart-search-kbd" id="searchKbd">/</kbd>
+    </div>
+
+    <!-- Designation filter pills -->
+    <div class="filter-pills" id="filterPills">
+      <button class="filter-pill {% if not designation_filter %}active{% endif %}" data-designation="">All</button>
+      {% for d in designations %}
+      <button class="filter-pill {% if designation_filter == d %}active{% endif %}" data-designation="{{ d }}">{{ d }}</button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Availability filter row -->
+  <div class="avail-filter-row">
+    <span class="avail-label">Availability:</span>
+    <button class="avail-pill {% if not availability_filter %}active{% endif %}" data-avail="">All</button>
+    <button class="avail-pill {% if availability_filter == 'active' %}active{% endif %}" data-avail="active">
+      <span class="status-dot dot-active"></span> On Active Project
+    </button>
+    <button class="avail-pill {% if availability_filter == 'available' %}active{% endif %}" data-avail="available">
+      <span class="status-dot dot-available"></span> Available
+    </button>
+  </div>
+
+  <!-- Result info bar -->
+  <div class="search-result-bar" id="searchResultBar" style="display:none">
+    <span id="resultCount"></span>
+    <button class="btn btn-ghost" id="clearAllFilters" style="font-size:12px;padding:4px 10px">Clear all</button>
+  </div>
+</div>
+
+<!-- ── Employee Grid ──────────────────────────────────── -->
+{% if employees %}
+<div class="employee-grid" id="employeeGrid">
+  {% for emp in employees %}
+  <a href="{% url 'records:employee_detail' emp.emp_id %}"
+     class="employee-card"
+     data-name="{{ emp.emp_name|lower }}"
+     data-email="{{ emp.email|lower }}"
+     data-designation="{{ emp.designation|lower }}"
+     data-skills="{% for es in emp.employee_skills.all %}{{ es.skill.skill_name|lower }} {% endfor %}"
+     data-availability="{% if emp.active_project_count > 0 %}active{% else %}available{% endif %}">
+
+    <!-- Header -->
+    <div class="emp-card-header">
+      <div class="avatar-wrap">
+        <div class="avatar" style="background: linear-gradient(135deg,
+          {% cycle '#58a6ff,#bc8cff' '#3fb950,#39d4d1' '#bc8cff,#58a6ff' '#f0883e,#f85149' '#39d4d1,#3fb950' %})">
+          {{ emp.get_initials }}
+        </div>
+        <span class="avatar-status-dot {% if emp.active_project_count > 0 %}dot-active{% else %}dot-avail{% endif %}"></span>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <div class="emp-name emp-highlight">{{ emp.emp_name }}</div>
+          {% if emp.active_project_count > 0 %}
+          <span class="status-badge active">● On Project</span>
+          {% else %}
+          <span class="status-badge available">○ Available</span>
+          {% endif %}
+        </div>
+        <div class="emp-designation emp-highlight">{{ emp.designation }}</div>
+        <div class="emp-email">{{ emp.email }}</div>
+      </div>
+    </div>
+
+    <!-- Stats row -->
+    <div class="emp-meta">
+      <div class="meta-item">
+        <span class="meta-label">Experience</span>
+        <span class="meta-value">{{ emp.experience|default:"—" }}</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Joined</span>
+        <span class="meta-value">{{ emp.joining_date|default:"—" }}</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Skills</span>
+        <span class="meta-value">{{ emp.employee_skills.count }}</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Util %</span>
+        {% with u=emp.total_utilization|default:0 %}
+        <span class="meta-value" style="font-weight:700;color:{% if u < 25 %}var(--accent-red){% elif u <= 50 %}#e3a008{% else %}var(--accent-green){% endif %}">{{ u }}%</span>
+        {% endwith %}
+      </div>
+    </div>
+
+    <!-- Skill tags -->
+    {% if emp.employee_skills.all %}
+    <div class="tags">
+      {% for es in emp.employee_skills.all|slice:":4" %}
+        <span class="badge badge-blue">{{ es.skill.skill_name }}</span>
+      {% endfor %}
+      {% if emp.employee_skills.count > 4 %}
+        <span class="badge badge-purple">+{{ emp.employee_skills.count|add:"-4" }} more</span>
+      {% endif %}
+    </div>
+    {% endif %}
+
+  </a>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="empty-state" id="emptyInitial">
+  <div class="empty-state-icon">🔍</div>
+  <div class="empty-state-text">No employees found.</div>
+</div>
+{% endif %}
+
+<!-- No results message (injected by JS) -->
+<div class="empty-state" id="noResults" style="display:none">
+  <div class="empty-state-icon">🤷</div>
+  <div class="empty-state-text" id="noResultsText">No employees match your search.</div>
+  <button class="btn btn-secondary" style="margin-top:16px" id="clearSearchBtn">Clear Search</button>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<style>
+/* ── Smart Search Bar ─────────────────────────────────────── */
+.smart-search-container {
+  margin-bottom: 28px;
+}
+
+.smart-search-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.smart-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 260px;
+  display: flex;
+  align-items: center;
+}
+
+.smart-search-icon {
+  position: absolute;
+  left: 14px;
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+  pointer-events: none;
+  flex-shrink: 0;
+  transition: color 0.2s;
+}
+
+.smart-search-wrap:focus-within .smart-search-icon {
+  color: var(--accent-blue);
+}
+
+.smart-search-input {
+  width: 100%;
+  padding: 13px 110px 13px 46px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.smart-search-input:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 4px rgba(88,166,255,0.14), 0 2px 12px rgba(0,0,0,0.3);
+  background: var(--bg-secondary);
+}
+
+.smart-search-input::placeholder { color: var(--text-muted); }
+
+.smart-search-meta {
+  position: absolute;
+  right: 72px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.smart-search-clear {
+  position: absolute;
+  right: 42px;
+  width: 22px; height: 22px;
+  background: var(--bg-card-hover);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.2s;
+  padding: 0;
+}
+.smart-search-clear svg { width: 11px; height: 11px; }
+.smart-search-clear:hover { background: rgba(248,81,73,0.15); color: var(--accent-red); border-color: rgba(248,81,73,0.4); }
+
+.smart-search-kbd {
+  position: absolute;
+  right: 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: monospace;
+  pointer-events: none;
+}
+
+/* ── Filter Pills ─────────────────────────────────────── */
+.filter-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-pill {
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1.5px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.filter-pill:hover { border-color: var(--accent-blue); color: var(--accent-blue); background: rgba(88,166,255,0.06); }
+.filter-pill.active { background: rgba(88,166,255,0.15); color: var(--accent-blue); border-color: var(--accent-blue); }
+
+/* ── Result Bar ────────────────────────────────────────── */
+.search-result-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding: 8px 14px;
+  background: rgba(88,166,255,0.06);
+  border: 1px solid rgba(88,166,255,0.2);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--accent-blue);
+  font-weight: 500;
+}
+
+/* ── Highlight matching text ───────────────────────────── */
+.search-highlight {
+  background: rgba(88,166,255,0.25);
+  color: var(--accent-blue);
+  border-radius: 3px;
+  padding: 0 2px;
+  font-weight: 700;
+}
+
+/* ── Availability filter row ─────────────────────────── */
+.avail-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.avail-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+
+.avail-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1.5px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.avail-pill:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+.avail-pill.active { background: rgba(88,166,255,0.1); color: var(--accent-blue); border-color: var(--accent-blue); }
+
+/* Status dots */
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.dot-active    { background: var(--accent-green); box-shadow: 0 0 0 2px rgba(63,185,80,0.25); animation: pulse-dot 2s ease-in-out infinite; }
+.dot-available { background: var(--text-muted); }
+
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(63,185,80,0.25); }
+  50%       { box-shadow: 0 0 0 4px rgba(63,185,80,0.1); }
+}
+
+/* ── Avatar with status dot ──────────────────────────── */
+.avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.avatar-status-dot {
+  position: absolute;
+  bottom: 2px; right: 2px;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-card);
+}
+.avatar-status-dot.dot-active { background: var(--accent-green); animation: pulse-dot 2s ease-in-out infinite; }
+.avatar-status-dot.dot-avail  { background: var(--text-muted); }
+
+/* ── Status badge in card ────────────────────────────── */
+.status-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.status-badge.active    { background: rgba(63,185,80,0.12); color: var(--accent-green); border: 1px solid rgba(63,185,80,0.3); }
+.status-badge.available { background: rgba(110,118,129,0.1); color: var(--text-muted);   border: 1px solid rgba(110,118,129,0.2); }
+
+/* Hide cards */
+.employee-card[data-hidden="true"] {
+  display: none;
+}
+</style>
+
+<script>
+(function () {
+  const input        = document.getElementById('liveSearch');
+  const clearBtn     = document.getElementById('clearSearch');
+  const clearBtnAlt  = document.getElementById('clearSearchBtn');
+  const clearAll     = document.getElementById('clearAllFilters');
+  const kbd          = document.getElementById('searchKbd');
+  const meta         = document.getElementById('searchMeta');
+  const resultBar    = document.getElementById('searchResultBar');
+  const resultCount  = document.getElementById('resultCount');
+  const noResults    = document.getElementById('noResults');
+  const noResultsTxt = document.getElementById('noResultsText');
+  const pills        = document.querySelectorAll('.filter-pill');
+  const availPills   = document.querySelectorAll('.avail-pill');
+  const cards        = document.querySelectorAll('.employee-card');
+
+  let query     = input.value.trim().toLowerCase();
+  let activeDes = '{{ designation_filter|lower|escapejs }}';
+  let activeAvail = '{{ availability_filter|escapejs }}';
+
+  // Keyboard shortcut: / to focus
+  document.addEventListener('keydown', e => {
+    if (e.key === '/' && document.activeElement !== input && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) {
+      e.preventDefault();
+      input.focus();
+    }
+    if (e.key === 'Escape' && document.activeElement === input) {
+      input.blur();
+    }
+  });
+
+  input.addEventListener('focus', () => { kbd.style.opacity = '0'; });
+  input.addEventListener('blur',  () => { kbd.style.opacity = '1'; });
+
+  function highlight(text, q) {
+    if (!q) return text;
+    const regex = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    return text.replace(regex, '<mark class="search-highlight">$1</mark>');
+  }
+
+  function filterCards() {
+    let visible = 0;
+    cards.forEach(card => {
+      const name   = card.dataset.name         || '';
+      const email  = card.dataset.email        || '';
+      const desig  = card.dataset.designation  || '';
+      const skills = card.dataset.skills       || '';
+      const avail  = card.dataset.availability || '';
+
+      const matchQuery = !query ||
+        name.includes(query) || email.includes(query) ||
+        desig.includes(query) || skills.includes(query);
+
+      const matchDes   = !activeDes   || desig === activeDes;
+      const matchAvail = !activeAvail || avail === activeAvail;
+
+      if (matchQuery && matchDes && matchAvail) {
+        card.removeAttribute('data-hidden');
+        visible++;
+        const nameEl  = card.querySelector('.emp-name');
+        const desigEl = card.querySelector('.emp-designation');
+        if (nameEl)  nameEl.innerHTML  = highlight(nameEl.dataset.raw  || nameEl.textContent, query);
+        if (desigEl) desigEl.innerHTML = highlight(desigEl.dataset.raw || desigEl.textContent, query);
+      } else {
+        card.setAttribute('data-hidden', 'true');
+      }
+    });
+    return visible;
+  }
+
+  // Store raw text once
+  cards.forEach(card => {
+    const nameEl  = card.querySelector('.emp-name');
+    const desigEl = card.querySelector('.emp-designation');
+    if (nameEl  && !nameEl.dataset.raw)  nameEl.dataset.raw  = nameEl.textContent;
+    if (desigEl && !desigEl.dataset.raw) desigEl.dataset.raw = desigEl.textContent;
+  });
+
+  function updateUI() {
+    const hasQuery = query.length > 0 || activeDes.length > 0 || activeAvail.length > 0;
+    const visible = filterCards();
+
+    meta.textContent = cards.length > 0 ? `${visible} / ${cards.length}` : '';
+    clearBtn.style.display = query.length > 0 ? 'flex' : 'none';
+    kbd.style.display = query.length > 0 ? 'none' : '';
+
+    if (hasQuery) {
+      resultBar.style.display = 'flex';
+      resultCount.textContent = `Showing ${visible} of ${cards.length} employee${cards.length !== 1 ? 's' : ''}`;
+    } else {
+      resultBar.style.display = 'none';
+    }
+
+    if (visible === 0 && cards.length > 0) {
+      noResults.style.display = 'flex';
+      noResultsTxt.textContent = `No employees match the current filters.`;
+    } else {
+      noResults.style.display = 'none';
+    }
+  }
+
+  // Live search
+  let debounce;
+  input.addEventListener('input', () => {
+    query = input.value.trim().toLowerCase();
+    clearTimeout(debounce);
+    debounce = setTimeout(updateUI, 80);
+  });
+
+  function clearSearch() {
+    input.value = '';
+    query = '';
+    updateUI();
+    input.focus();
+  }
+  clearBtn.addEventListener('click', clearSearch);
+  if (clearBtnAlt) clearBtnAlt.addEventListener('click', clearSearch);
+
+  // Clear all
+  if (clearAll) {
+    clearAll.addEventListener('click', () => {
+      clearSearch();
+      activeDes   = '';
+      activeAvail = '';
+      pills.forEach(p => p.classList.toggle('active', p.dataset.designation === ''));
+      availPills.forEach(p => p.classList.toggle('active', p.dataset.avail === ''));
+      updateUI();
+    });
+  }
+
+  // Designation pills
+  pills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      activeDes = pill.dataset.designation.toLowerCase();
+      pills.forEach(p => p.classList.toggle('active', p === pill));
+      updateUI();
+    });
+  });
+
+  // Availability pills
+  availPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      activeAvail = pill.dataset.avail;
+      availPills.forEach(p => p.classList.toggle('active', p === pill));
+      updateUI();
+    });
+  });
+
+  // Run on load
+  updateUI();
+})();
+</script>
+{% endblock %}
+

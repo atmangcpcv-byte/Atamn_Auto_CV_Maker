@@ -1,0 +1,63 @@
+{% extends "records/base.html" %}
+{% block title %}Projects — Office Records{% endblock %}
+{% block page_title %}Projects{% endblock %}
+{% block page_sub %}{{ projects|length }} project{{ projects|length|pluralize }} in the system{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'records:dashboard' %}" class="btn btn-secondary">← Dashboard</a>
+{% if user_iam == 'HR' or user_iam == 'Manager' %}
+<a href="{% url 'records:add_project' %}" class="btn btn-primary" style="margin-left: 8px;">✨ Add Project</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:24px">
+  {% for proj in projects %}
+  <a href="{% url 'records:project_detail' proj.project_id %}" class="project-card" style="text-decoration:none;color:inherit">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">
+      <div style="font-size:14px;color:var(--text-muted);font-weight:500">Project #{{ proj.project_id }}</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        {% if proj.status %}
+        <span class="badge {% if proj.status == 'Active' %}badge-green{% elif proj.status == 'Completed' %}badge-blue{% elif proj.status == 'On Hold' %}badge-orange{% else %}badge-red{% endif %}">
+          {% if proj.status == 'Active' %}● {% elif proj.status == 'Completed' %}✓ {% endif %}{{ proj.status }}
+        </span>
+        {% endif %}
+        <span class="badge badge-green">{{ proj.team_size }} member{{ proj.team_size|pluralize }}</span>
+      </div>
+    </div>
+
+    <h2 class="project-name">{{ proj.project_name }}</h2>
+    <p class="project-desc">{{ proj.description }}</p>
+
+    <!-- Tech Stack -->
+    {% if proj.technologies.all %}
+    <div class="tags" style="margin-bottom:16px">
+      {% for pt in proj.technologies.all %}
+      <span class="badge badge-purple">{{ pt.skill.skill_name }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Team Avatars -->
+    <div style="display:flex;align-items:center;gap:-6px;margin-top:auto">
+      {% for work in proj.works.all|slice:":5" %}
+      <div class="avatar" style="width:32px;height:32px;font-size:11px;margin-left:{% if not forloop.first %}-8px{% else %}0{% endif %};border:2px solid var(--bg-card);z-index:{{ forloop.revcounter }};background:linear-gradient(135deg,
+        {% cycle '#58a6ff,#bc8cff' '#3fb950,#39d4d1' '#bc8cff,#58a6ff' '#f0883e,#f85149' %})">
+        {{ work.employee.get_initials }}
+      </div>
+      {% endfor %}
+      <span style="margin-left:10px;font-size:12px;color:var(--text-muted)">Team</span>
+    </div>
+
+    <div style="margin-top:16px;font-size:12px;color:var(--accent-blue);font-weight:600">View Details →</div>
+  </a>
+  {% empty %}
+  <div class="empty-state" style="grid-column:1/-1">
+    <div class="empty-state-icon">📁</div>
+    <div class="empty-state-text">No projects found.</div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "records/base.html" %}
+{% block title %}Skills — Office Records{% endblock %}
+{% block page_title %}Skills Overview{% endblock %}
+{% block page_sub %}All tracked skills grouped by category{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'records:dashboard' %}" class="btn btn-secondary">← Dashboard</a>
+{% endblock %}
+
+{% block content %}
+
+{% for category, items in categories.items %}
+<div class="mb-32">
+  <div class="section-title">
+    {% if 'programming' in category|lower %}💻
+    {% elif 'ai' in category|lower or 'llm' in category|lower %}🤖
+    {% elif 'cloud' in category|lower %}☁️
+    {% elif 'framework' in category|lower %}⚙️
+    {% elif 'database' in category|lower %}🗄️
+    {% else %}⚡
+    {% endif %}
+    {{ category }}
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+    {% for item in items %}
+    <div class="card" style="padding:20px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-size:15px;font-weight:700;color:var(--text-primary)">{{ item.skill.skill_name }}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">{{ item.skill.skill_id }}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:13px;color:var(--accent-green);font-weight:700">{{ item.avg_rating }}/5</div>
+          <div style="font-size:11px;color:var(--text-muted)">avg rating</div>
+        </div>
+      </div>
+
+      <!-- Skill Bar -->
+      <div class="skill-bar-bg" style="margin-bottom:12px">
+        <div class="skill-bar-fill" data-pct="{{ item.avg_pct }}"></div>
+      </div>
+
+      <!-- Employees Count -->
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:12px;color:var(--text-muted)">
+          👤 {{ item.emp_count }} employee{{ item.emp_count|pluralize }}
+        </span>
+
+        <!-- Mini employee avatars -->
+        <div style="display:flex;gap:4px">
+          {% for es in item.skill.employee_skills.all|slice:":4" %}
+          <a href="{% url 'records:employee_detail' es.employee.emp_id %}"
+             title="{{ es.employee.emp_name }}">
+            <div class="avatar" style="width:26px;height:26px;font-size:10px;background:linear-gradient(135deg,{% cycle '#58a6ff,#bc8cff' '#3fb950,#39d4d1' '#f0883e,#f85149' '#bc8cff,#58a6ff' %})">
+              {{ es.employee.get_initials }}
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% empty %}
+<div class="empty-state">
+  <div class="empty-state-icon">⚡</div>
+  <div class="empty-state-text">No skills found in the database.</div>
+</div>
+{% endfor %}
+
+{% endblock %}

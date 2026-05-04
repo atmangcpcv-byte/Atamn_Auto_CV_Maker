@@ -1,0 +1,395 @@
+{% extends "records/base.html" %}
+{% block title %}{{ employee.emp_name }} — Office Records{% endblock %}
+{% block page_title %}{{ employee.emp_name }}{% endblock %}
+{% block page_sub %}{{ employee.designation }} · {{ employee.experience }}{% endblock %}
+
+{% block topbar_actions %}
+<div style="display:flex;gap:8px;">
+  {% if user_iam == 'HR' or user_iam == 'Manager' and can_manager_edit %}
+  <a href="{% url 'records:edit_employee' employee.emp_id %}" class="btn btn-secondary">✏️ Edit</a>
+  {% endif %}
+  
+  {% if user_iam == 'HR' %}
+  <form id="delete-form-{{ employee.emp_id }}" method="POST" action="{% url 'records:delete_employee' employee.emp_id %}" style="display:none;">
+    {% csrf_token %}
+  </form>
+  <button type="button" class="btn btn-danger" onclick="if(confirm('Are you sure you want to completely delete {{ employee.emp_name }}? This cannot be undone.')) document.getElementById('delete-form-{{ employee.emp_id }}').submit();">
+    🗑 Delete
+  </button>
+  {% endif %}
+  
+  {% if user_iam == 'HR' or user_iam == 'Manager' or request.session.emp_id|stringformat:"s" == employee.emp_id|stringformat:"s" %}
+  <button class="btn btn-primary" onclick="document.getElementById('jdModal').style.display='block'">📥 Generate AI Resume</button>
+  {% endif %}
+  
+  <a href="{% url 'records:employee_list' %}" class="btn btn-secondary">← All Employees</a>
+</div>
+{% endblock %}
+
+{% block modal %}
+<!-- Job Description Modal -->
+<div id="jdModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:9999; padding:20px; backdrop-filter:blur(6px); overflow-y:auto;">
+  <div class="card animate-fade-in-up" style="width:100%; max-width:600px; margin: 10vh auto; background:var(--bg-card); position:relative; padding:32px; border-radius:16px; box-shadow: 0 24px 48px rgba(0,0,0,0.15); border:1px solid var(--border-light);">
+    <button onclick="document.getElementById('jdModal').style.display='none'" style="position:absolute; right:20px; top:20px; background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-secondary); width:32px; height:32px; border-radius:50%; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;" onmouseover="this.style.color='var(--accent-red)'; this.style.borderColor='var(--accent-red)';" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='var(--border)';">&times;</button>
+    
+    <h2 style="margin-bottom:8px; display:flex; align-items:center; gap:10px; font-size:22px; color:var(--text-primary);">
+      <span style="background:var(--bg-secondary); padding:8px; border-radius:10px; border:1px solid var(--border);">🎯</span> 
+      Target Job Description
+    </h2>
+    <p style="color:var(--text-secondary); font-size:14px; margin-bottom:24px; line-height:1.6;">
+      Paste the exact Job Description you are applying for. The AI will completely rewire and optimize your profile summary, skills logic, and bullet points to explicitly highlight and prioritize matching experiences.
+    </p>
+    
+    <form method="POST" action="{% url 'records:download_resume' employee.emp_id %}" onsubmit="setTimeout(() => document.getElementById('jdModal').style.display='none', 1000);">
+      {% csrf_token %}
+      <textarea name="job_description" class="form-control" rows="8" placeholder="Paste the job description here (Leave blank for a general template resume)..." style="margin-bottom:24px; resize:vertical; background:var(--bg-secondary); border:2px solid var(--border); border-radius:12px; padding:16px; font-size:14px; color:var(--text-primary); transition:all 0.2s; width:100%;" onfocus="this.style.borderColor='var(--accent-blue)'; this.style.boxShadow='0 0 0 4px rgba(88,166,255,0.1)';" onblur="this.style.borderColor='var(--border)'; this.style.boxShadow='none';"></textarea>
+      
+      <div style="display:flex; justify-content:flex-end; gap:12px; flex-wrap:wrap;">
+        <button type="button" onclick="document.getElementById('jdModal').style.display='none'" style="padding:10px 20px; font-weight:600; font-size:14px; border-radius:10px; color:var(--text-secondary); background:var(--bg-secondary); border:1px solid var(--border); cursor:pointer; transition:all 0.2s;" onmouseover="this.style.background='var(--border-light)'; this.style.color='var(--text-primary)';" onmouseout="this.style.background='var(--bg-secondary)'; this.style.color='var(--text-secondary)';">
+          Cancel
+        </button>
+        <button type="submit" name="template_type" value="general" style="display:flex; align-items:center; gap:8px; padding:10px 24px; font-weight:600; font-size:14px; border-radius:10px; background:linear-gradient(135deg, var(--accent-blue), #8c52ff); border:none; color:white; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 16px rgba(88,166,255,0.4)';" onmouseout="this.style.transform='none'; this.style.boxShadow='none';" onclick="this.innerHTML='⏳ Generating...';">
+          ✨ General Resume
+        </button>
+        <button type="submit" name="template_type" value="prof" style="display:flex; align-items:center; gap:8px; padding:10px 24px; font-weight:600; font-size:14px; border-radius:10px; background:linear-gradient(135deg, #f0883e, #f85149); border:none; color:white; cursor:pointer; transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 16px rgba(248,81,73,0.4)';" onmouseout="this.style.transform='none'; this.style.boxShadow='none';" onclick="this.innerHTML='⏳ Generating...';">
+          🌟 Prof Template
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Profile Banner ─────────────────────────────────── -->
+<div class="profile-banner">
+  <div style="position:relative;flex-shrink:0">
+    <div class="avatar xl" style="background:linear-gradient(135deg,#58a6ff,#bc8cff)">
+      {{ employee.get_initials }}
+    </div>
+    {% if active_works %}
+    <span style="position:absolute;bottom:4px;right:4px;width:16px;height:16px;background:var(--accent-green);border-radius:50%;border:3px solid var(--bg-secondary);animation:pulse-ring 2s ease-in-out infinite"></span>
+    {% else %}
+    <span style="position:absolute;bottom:4px;right:4px;width:16px;height:16px;background:var(--text-muted);border-radius:50%;border:3px solid var(--bg-secondary)"></span>
+    {% endif %}
+  </div>
+  <div class="profile-info">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px">
+      <h1 class="profile-name" style="margin-bottom:0">{{ employee.emp_name }}</h1>
+      {% if active_works %}
+      <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(63,185,80,0.12);border:1px solid rgba(63,185,80,0.35);border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;color:var(--accent-green)">
+        <span style="width:7px;height:7px;border-radius:50%;background:var(--accent-green);animation:pulse-ring 2s ease-in-out infinite"></span>
+        On Active Project
+      </span>
+      {% else %}
+      <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(110,118,129,0.1);border:1px solid rgba(110,118,129,0.25);border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;color:var(--text-muted)">
+        <span style="width:7px;height:7px;border-radius:50%;background:var(--text-muted)"></span>
+        Available
+      </span>
+      {% endif %}
+    </div>
+    <div class="profile-designation">{{ employee.designation }}</div>
+
+    {% if active_works %}
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;margin-bottom:4px">
+      {% for aw in active_works %}
+      <a href="{% url 'records:project_detail' aw.project.project_id %}" style="display:inline-flex;align-items:center;gap:5px;background:rgba(63,185,80,0.08);border:1px solid rgba(63,185,80,0.2);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--accent-green);text-decoration:none;font-weight:600" title="Current project">
+        📁 {{ aw.project.project_name }}
+        {% if aw.role_in_project %}<span style="opacity:0.7;font-weight:400">· {{ aw.role_in_project }}</span>{% endif %}
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if employee.profile_summary %}
+    <p class="profile-summary">{{ employee.profile_summary }}</p>
+    {% endif %}
+
+    <div class="profile-stats">
+      <div class="ps-item">
+        <span class="ps-value">{{ employee.experience|default:"—" }}</span>
+        <span class="ps-label">Experience</span>
+      </div>
+      <div class="ps-item">
+        <span class="ps-value">{{ emp_skills.count }}</span>
+        <span class="ps-label">Skills</span>
+      </div>
+      <div class="ps-item">
+        <span class="ps-value">{{ works.count }}</span>
+        <span class="ps-label">Projects</span>
+      </div>
+      <div class="ps-item">
+        <span class="ps-value">{{ certifications.count }}</span>
+        <span class="ps-label">Certs</span>
+      </div>
+      <div class="ps-item">
+        {% with u=employee.total_utilization|default:0 %}
+        <span class="ps-value" style="color:{% if u < 25 %}var(--accent-red){% elif u <= 50 %}#e3a008{% else %}var(--accent-green){% endif %}">{{ u }}%</span>
+        {% endwith %}
+        <span class="ps-label">Utilization</span>
+      </div>
+    </div>
+
+    <div class="tags" style="margin-top:16px">
+      {% if employee.email %}
+      <a href="mailto:{{ employee.email }}" class="badge badge-blue">✉️ {{ employee.email }}</a>
+      {% endif %}
+      {% if employee.linkedin_url %}
+      <a href="{{ employee.linkedin_url }}" target="_blank" class="badge badge-cyan">🔗 LinkedIn</a>
+      {% endif %}
+      {% if employee.github_portfolio_url %}
+      <a href="{{ employee.github_portfolio_url }}" target="_blank" class="badge badge-purple">💻 Portfolio</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(63,185,80,0.4); }
+  50%       { box-shadow: 0 0 0 4px rgba(63,185,80,0.1); }
+}
+</style>
+
+
+<!-- ── Tabs ───────────────────────────────────────────── -->
+<div class="tab-group">
+  <div class="tab-nav">
+    <button class="tab-btn active" data-tab="tab-skills">⚡ Skills</button>
+    <button class="tab-btn" data-tab="tab-projects">📁 Projects</button>
+    <button class="tab-btn" data-tab="tab-experience">🏢 Experience</button>
+    <button class="tab-btn" data-tab="tab-education">🎓 Education</button>
+    <button class="tab-btn" data-tab="tab-certs">🏅 Certifications</button>
+    <button class="tab-btn" data-tab="tab-team">👥 Team</button>
+  </div>
+
+  <!-- Skills Tab -->
+  <div class="tab-panel active" id="tab-skills">
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title mb-16">Skill Ratings</div>
+        {% if can_see_ratings %}
+          {% if emp_skills %}
+            {% for es in emp_skills %}
+            <div class="skill-bar-wrap">
+              <div class="skill-bar-header">
+                <div>
+                  <span class="skill-bar-name">{{ es.skill.skill_name }}</span>
+                  <span class="badge badge-purple" style="margin-left:6px;font-size:10px">{{ es.skill.category }}</span>
+                </div>
+                <span class="skill-bar-rating">{{ es.aggregate_rating }}/5</span>
+              </div>
+              <div class="skill-bar-bg">
+                <div class="skill-bar-fill" data-pct="{{ es.rating_percentage }}"></div>
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="empty-state" style="padding:30px">
+              <div class="empty-state-icon">⚡</div>
+              <div class="empty-state-text">No skills recorded.</div>
+            </div>
+          {% endif %}
+        {% else %}
+          <div class="empty-state" style="padding:30px; text-align:center;">
+            <div class="empty-state-icon">🔒</div>
+            <div class="empty-state-text" style="color:var(--text-muted);">Skill ratings are private.</div>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <div class="card-title mb-16">Skill Categories</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          {% regroup emp_skills by skill.category as skill_cats %}
+          {% for cat in skill_cats %}
+          <div style="background:var(--bg-secondary);border-radius:8px;padding:14px 16px;border:1px solid var(--border)">
+            <div style="font-size:12px;color:var(--text-muted);mb-6px;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">{{ cat.grouper }}</div>
+            <div class="tags">
+              {% for es in cat.list %}
+              <span class="badge badge-blue">{{ es.skill.skill_name }}</span>
+              {% endfor %}
+            </div>
+          </div>
+          {% empty %}
+          <div class="text-muted">No skill categories found.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Previous Experience Tab -->
+  <div class="tab-panel" id="tab-experience">
+    {% if previous_experiences %}
+    <div style="display:flex;flex-direction:column;gap:0">
+      <ul class="timeline">
+        {% for exp in previous_experiences %}
+        <li class="timeline-item">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+            <div>
+              <div class="timeline-role">{{ exp.role }}</div>
+              <div class="timeline-project">{{ exp.company_name }}</div>
+            </div>
+            {% if exp.duration %}
+            <span class="badge badge-orange" style="flex-shrink:0">⏱ {{ exp.duration }}</span>
+            {% endif %}
+          </div>
+          {% if exp.description %}
+          <p class="timeline-summary">{{ exp.description }}</p>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">🏢</div>
+      <div class="empty-state-text">No previous experience recorded.</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Projects Tab -->
+  <div class="tab-panel" id="tab-projects">
+    {% if works %}
+    <ul class="timeline">
+      {% for work in works %}
+      <li class="timeline-item">
+        <div class="timeline-role">{{ work.role_in_project }}</div>
+        <div style="display:flex;align-items:center;gap:12px;margin: 4px 0;">
+          <a href="{% url 'records:project_detail' work.project.project_id %}" class="timeline-project" style="margin:0;">
+            {{ work.project.project_name }}
+          </a>
+          {% if work.project.status %}
+          <span class="badge {% if work.project.status == 'Active' %}badge-green{% elif work.project.status == 'Completed' %}badge-purple{% elif work.project.status == 'On Hold' %}badge-orange{% else %}badge-red{% endif %}">
+              {{ work.project.status }}
+          </span>
+          {% endif %}
+          {% if work.utilization %}
+          <span class="badge" style="background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);color:{% if work.utilization < 25 %}var(--accent-red){% elif work.utilization <= 50 %}#e3a008{% else %}var(--accent-green){% endif %};font-weight:700;">⏱ {{ work.utilization }}% time</span>
+          {% endif %}
+        </div>
+        {% if work.work_summary %}
+        <p class="timeline-summary">{{ work.work_summary }}</p>
+        {% endif %}
+
+        <!-- Skill analysis for this work -->
+        {% if can_see_ratings and work.skill_analyses.all %}
+        <div class="tags" style="margin-top:10px">
+          {% for sa in work.skill_analyses.all %}
+          <span class="badge badge-green" title="Rating: {{ sa.rating }}/5">
+            {{ sa.skill.skill_name }} ⭐ {{ sa.rating }}
+          </span>
+          {% endfor %}
+        </div>
+        {% elif not can_see_ratings and work.skill_analyses.all %}
+        <div style="margin-top:10px; font-size:12px; color:var(--text-muted);">
+          <span class="badge" style="background:var(--bg-secondary);color:var(--text-muted);">🔒 Skill ratings hidden</span>
+        </div>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">📁</div>
+      <div class="empty-state-text">No project contributions recorded.</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Education Tab -->
+  <div class="tab-panel" id="tab-education">
+    {% if educations %}
+    <div style="display:flex;flex-direction:column;gap:16px">
+      {% for edu in educations %}
+      <div class="card" style="padding:20px">
+        <div style="display:flex;align-items:flex-start;gap:16px">
+          <div style="font-size:32px">🎓</div>
+          <div style="flex:1">
+            <div style="font-size:16px;font-weight:700;color:var(--text-primary)">{{ edu.degree }} in {{ edu.field_of_study }}</div>
+            <div style="font-size:13px;color:var(--accent-blue);margin:4px 0">{{ edu.institution }}</div>
+            <div style="display:flex;gap:20px;margin-top:10px">
+              <div class="meta-item">
+                <span class="meta-label">Graduation Year</span>
+                <span class="meta-value">{{ edu.graduation_year }}</span>
+              </div>
+              {% if edu.cgpa_or_percentage %}
+              <div class="meta-item">
+                <span class="meta-label">CGPA / Percentage</span>
+                <span class="meta-value" style="color:var(--accent-green)">{{ edu.cgpa_or_percentage }}</span>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">🎓</div>
+      <div class="empty-state-text">No education records found.</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Certifications Tab -->
+  <div class="tab-panel" id="tab-certs">
+    {% if certifications %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px">
+      {% for cert in certifications %}
+      <div class="card" style="padding:20px;display:flex;align-items:center;gap:14px">
+        <div style="font-size:36px">🏅</div>
+        <div>
+          <div style="font-size:14px;font-weight:600;color:var(--text-primary)">{{ cert.cert_name }}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Certificate ID: {{ cert.cert_id }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">🏅</div>
+      <div class="empty-state-text">No certifications recorded.</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Team Tab -->
+  <div class="tab-panel" id="tab-team">
+    {% if team_members %}
+    <div class="employee-grid">
+      {% for member in team_members %}
+      <a href="{% url 'records:employee_detail' member.emp_id %}" class="employee-card">
+        <div class="emp-card-header">
+          <div class="avatar" style="background:linear-gradient(135deg,#3fb950,#39d4d1)">
+            {{ member.get_initials }}
+          </div>
+          <div>
+            <div class="emp-name">{{ member.emp_name }}</div>
+            <div class="emp-designation">{{ member.designation }}</div>
+          </div>
+        </div>
+        <div class="emp-meta">
+          <div class="meta-item">
+            <span class="meta-label">Experience</span>
+            <span class="meta-value">{{ member.experience|default:"—" }}</span>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">👥</div>
+      <div class="empty-state-text">No team members found on shared projects.</div>
+    </div>
+    {% endif %}
+  </div>
+
+</div><!-- end tab-group -->
+
+{% endblock %}

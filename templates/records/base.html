@@ -1,0 +1,268 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}Office Records System{% endblock %}</title>
+  <meta name="description" content="Office Record Display System — Employee CV Database POC"/>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v={{ request.resolver_match.url_name }}{% now 'U' %}"/>
+  {% block extra_head %}{% endblock %}
+
+  <!-- Theme Toggle Styles -->
+  <style>
+    /* ── Theme Toggle Switch ──────────────────────────────── */
+    .theme-switch {
+      position: relative;
+      width: 90px;
+      height: 36px;
+      border: 2px solid var(--border);
+      border-radius: 999px;
+      background: var(--bg-card);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+      cursor: pointer;
+      flex-shrink: 0;
+      user-select: none;
+    }
+    .theme-switch span {
+      font-size: 16px;
+      z-index: 2;
+      user-select: none;
+      opacity: 0.7;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+    .theme-switch:hover span { opacity: 1; }
+    .theme-switch .switch-knob {
+      position: absolute;
+      top: 2px;
+      left: 3px;
+      width: 28px;
+      height: 28px;
+      background: var(--accent-blue, #58a6ff);
+      border-radius: 50%;
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.35s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      pointer-events: none;
+    }
+    html.light-mode .theme-switch .switch-knob {
+      transform: translateX(52px);
+      background: #f6b73c;
+    }
+
+    /* ── Circular Ripple Overlay ──────────────────────────── */
+    #theme-ripple {
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 99999;
+      transform: scale(0);
+      opacity: 1;
+    }
+    #theme-ripple.ripple-expand {
+      animation: rippleOut 0.65s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    @keyframes rippleOut {
+      0%   { transform: scale(0); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+  </style>
+
+  <!-- Prevent FOUC Theme Script -->
+  <script>
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    if (savedTheme === 'light') {
+      document.documentElement.classList.add('light-mode');
+    }
+  </script>
+</head>
+<body>
+<div id="theme-ripple"></div>
+<div class="app-layout">
+
+  <!-- ── Sidebar ──────────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon" style="background:white;padding:4px">
+        <img src="{% static 'images/AI_Symbol.png' %}" alt="Logo" style="width:100%;height:100%;object-fit:contain;display:block">
+      </div>
+      <div class="brand-text">
+        <span class="brand-title">Office Records</span>
+        <span class="brand-sub">CV Database System</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Main</span>
+
+      <a href="{% url 'records:dashboard' %}"
+         class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+        <span class="nav-icon">🏠</span> Dashboard
+      </a>
+
+      <a href="{% url 'records:employee_list' %}"
+         class="nav-link {% if 'employee' in request.resolver_match.url_name %}active{% endif %}">
+        <span class="nav-icon">👥</span> Employees
+      </a>
+
+      <a href="{% url 'records:project_list' %}"
+         class="nav-link {% if 'project' in request.resolver_match.url_name %}active{% endif %}">
+        <span class="nav-icon">📁</span> Projects
+      </a>
+
+      <a href="{% url 'records:skills' %}"
+         class="nav-link {% if request.resolver_match.url_name == 'skills' %}active{% endif %}">
+        <span class="nav-icon">⚡</span> Skills
+      </a>
+
+      <span class="nav-section-label">Account</span>
+
+      <a href="{% url 'records:my_profile' %}" class="nav-link">
+        <span class="nav-icon">👤</span> My Profile
+      </a>
+
+      <a href="{% url 'records:logout' %}" class="nav-link">
+        <span class="nav-icon">🚪</span> Logout
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <a href="{% url 'records:my_profile' %}" class="user-card" style="text-decoration:none">
+        <div class="user-avatar" id="sidebarAvatar" data-name="{{ request.session.emp_name|default:'' }}">
+          <!-- JS will populate initials -->
+        </div>
+        <div class="user-info">
+          <div class="user-name">{{ request.session.emp_name }}</div>
+          <div class="user-role">{{ request.session.designation|default:"Employee" }}</div>
+        </div>
+      </a>
+    </div>
+  </aside>
+
+  <!-- ── Main Content ──────────────────────────────────── -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <main class="main-content">
+    <div class="topbar">
+      <div style="display:flex; align-items:center; gap:16px;">
+        <button class="mobile-nav-toggle" id="mobileNavToggle" aria-label="Toggle Navigation">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        <div>
+          <div class="topbar-title">{% block page_title %}Dashboard{% endblock %}</div>
+          <div class="topbar-sub">{% block page_sub %}{% endblock %}</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <div class="theme-switch" id="themeToggle" title="Toggle Light/Dark Mode">
+          <span>🌙</span>
+          <span>☀️</span>
+          <div class="switch-knob"></div>
+        </div>
+        {% block topbar_actions %}{% endblock %}
+      </div>
+    </div>
+
+    <div class="page-content animate-fade-in">
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+          <span>{{ message }}</span>
+        </div>
+      {% endfor %}
+
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+</div>
+
+<script>
+  // Animate skill bars on load
+  document.addEventListener('DOMContentLoaded', () => {
+    const bars = document.querySelectorAll('.skill-bar-fill[data-pct]');
+    requestAnimationFrame(() => {
+      bars.forEach(bar => {
+        bar.style.width = bar.dataset.pct + '%';
+      });
+    });
+
+    // Mobile Sidebar Toggle
+    const mobileToggle = document.getElementById('mobileNavToggle');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+
+    function toggleSidebar() {
+      sidebar.classList.toggle('open');
+      sidebarOverlay.classList.toggle('show');
+    }
+
+    if(mobileToggle && sidebar && sidebarOverlay) {
+        mobileToggle.addEventListener('click', toggleSidebar);
+        sidebarOverlay.addEventListener('click', toggleSidebar);
+    }
+
+    // Tab system
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const group = btn.closest('.tab-group') || document;
+        group.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        group.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab)?.classList.add('active');
+      });
+    });
+
+    // Theme Toggle Initialization
+    const themeToggle = document.getElementById('themeToggle');
+    const ripple = document.getElementById('theme-ripple');
+    themeToggle?.addEventListener('click', (e) => {
+      // Don't interrupt anim
+      if (ripple.classList.contains('ripple-expand')) return;
+
+      const isLightNow = document.documentElement.classList.contains('light-mode');
+      const newBg = isLightNow ? '#0d1117' : '#f6f8fa'; 
+      
+      const rect = themeToggle.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      const radius = Math.max(window.innerWidth, window.innerHeight) * 1.5;
+      
+      ripple.style.left = (x - radius) + 'px';
+      ripple.style.top = (y - radius) + 'px';
+      ripple.style.width = (radius * 2) + 'px';
+      ripple.style.height = (radius * 2) + 'px';
+      ripple.style.background = newBg;
+      
+      ripple.classList.add('ripple-expand');
+      
+      setTimeout(() => {
+        document.documentElement.classList.toggle('light-mode');
+        const isLight = document.documentElement.classList.contains('light-mode');
+        localStorage.setItem('theme', isLight ? 'light' : 'dark');
+      }, 250); 
+      
+      setTimeout(() => {
+        ripple.classList.remove('ripple-expand');
+      }, 700);
+    });
+
+    // Dynamic Avatar Generation
+    const avatarEl = document.getElementById('sidebarAvatar');
+    if (avatarEl) {
+      const bName = avatarEl.getAttribute('data-name');
+      if (bName) {
+        const words = bName.trim().split(/\s+/);
+        const calcInitials = words.slice(0, 2).map(w => w[0].toUpperCase()).join('');
+        avatarEl.textContent = calcInitials || "U";
+      } else {
+        avatarEl.textContent = "U";
+      }
+    }
+  });
+</script>
+{% block modal %}{% endblock %}
+
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

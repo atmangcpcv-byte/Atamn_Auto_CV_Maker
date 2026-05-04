@@ -1,0 +1,705 @@
+{% extends "records/base.html" %}
+{% block title %}Add Employee — Office Records{% endblock %}
+{% block page_title %}Add New Employee{% endblock %}
+{% block page_sub %}All fields are required — fill in the complete employee profile{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'records:employee_list' %}" class="btn btn-secondary">← Back to Employees</a>
+{% endblock %}
+
+{% block content %}
+<style>
+  .form-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  .form-section-title {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .form-group { margin-bottom: 16px; }
+  .form-group label {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .form-control {
+    width: 100%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+  }
+  .form-control:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(88,166,255,0.18);
+  }
+  .form-control.is-invalid { border-color: var(--accent-red, #f85149) !important; }
+  textarea.form-control { resize: vertical; min-height: 80px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  /* Required star */
+  .req { color: var(--accent-red, #f85149); margin-left: 2px; }
+
+  /* Dynamic rows */
+  .dynamic-row {
+    background: rgba(88,166,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 14px 10px;
+    margin-bottom: 10px;
+    position: relative;
+    transition: border-color 0.2s;
+  }
+  .dynamic-row:hover { border-color: rgba(88,166,255,0.25); }
+  .remove-row-btn {
+    position: absolute;
+    top: 10px; right: 10px;
+    background: none;
+    border: none;
+    color: var(--accent-red, #f85149);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background 0.2s;
+  }
+  .remove-row-btn:hover { background: rgba(248,81,73,0.12); }
+  .add-row-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: rgba(88,166,255,0.08);
+    border: 1.5px dashed rgba(88,166,255,0.35);
+    border-radius: var(--radius-sm);
+    color: var(--accent-blue);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 6px;
+    font-family: inherit;
+  }
+  .add-row-btn:hover { background: rgba(88,166,255,0.15); border-color: var(--accent-blue); }
+
+  /* Inner grids for dynamic rows */
+  .edu-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 8px; }
+  .edu-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .exp-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 8px; }
+  .skill-grid { display: grid; grid-template-columns: 2fr 1fr auto; gap: 10px; align-items: center; }
+  .cert-grid { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+
+  /* Searchable manager dropdown */
+  .manager-search-wrap { position: relative; }
+  .manager-search-input {
+    width: 100%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px 10px 40px;
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .manager-search-input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(88,166,255,0.18);
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+  .manager-search-icon {
+    position: absolute;
+    left: 12px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+    font-size: 14px;
+  }
+  .manager-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%; left: 0; right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--accent-blue);
+    border-top: none;
+    border-bottom-left-radius: var(--radius-sm);
+    border-bottom-right-radius: var(--radius-sm);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  .manager-dropdown.open { display: block; }
+  .manager-option {
+    padding: 9px 14px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-primary);
+    transition: background 0.15s;
+    border-bottom: 1px solid var(--border);
+  }
+  .manager-option:last-child { border-bottom: none; }
+  .manager-option:hover, .manager-option.highlighted { background: rgba(88,166,255,0.12); }
+  .manager-option.selected { background: rgba(88,166,255,0.2); font-weight: 600; }
+  .manager-selected-badge {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 6px 12px;
+    background: rgba(88,166,255,0.1);
+    border: 1px solid rgba(88,166,255,0.3);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--accent-blue);
+    font-weight: 600;
+  }
+  .manager-selected-badge.show { display: flex; }
+  .manager-clear-btn {
+    background: none; border: none;
+    color: var(--text-muted); cursor: pointer;
+    font-size: 14px; margin-left: auto; padding: 0 4px;
+  }
+  .manager-clear-btn:hover { color: var(--accent-red); }
+  .no-manager-option {
+    padding: 9px 14px;
+    font-size: 13px;
+    color: var(--text-muted);
+    font-style: italic;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  .no-manager-option:hover { background: rgba(88,166,255,0.06); }
+
+  /* Section error hint */
+  .section-error {
+    display: none;
+    color: var(--accent-red, #f85149);
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: rgba(248,81,73,0.08);
+    border: 1px solid rgba(248,81,73,0.25);
+    border-radius: 6px;
+  }
+  .section-error.show { display: block; }
+
+  /* ID hint */
+  .id-hint {
+    font-size: 12px; color: var(--text-muted);
+    margin-top: 8px; display: flex; align-items: center; gap: 6px;
+  }
+  .id-hint strong { color: var(--accent-blue); }
+
+  /* Save button */
+  .save-btn {
+    background: linear-gradient(135deg, #3fb950, #39d4d1);
+    color: white; border: none;
+    padding: 14px 40px;
+    border-radius: var(--radius-sm);
+    font-weight: 700; cursor: pointer; font-size: 16px;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: opacity 0.2s, transform 0.1s;
+    box-shadow: 0 4px 16px rgba(63,185,80,0.25);
+  }
+  .save-btn:hover { opacity: 0.92; transform: translateY(-1px); }
+  .save-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+</style>
+
+<!-- ── 1. BASIC INFO ─────────────────────────────────────────── -->
+<div class="form-section">
+  <div class="form-section-title">👤 1. Basic Information</div>
+  <div class="grid-3">
+    <div class="form-group">
+      <label>Full Name <span class="req">*</span></label>
+      <input type="text" id="emp_name" class="form-control" placeholder="e.g. Rahul Sharma">
+    </div>
+    <div class="form-group">
+      <label>Email <span class="req">*</span></label>
+      <input type="email" id="emp_email" class="form-control" placeholder="rahul@atman.in">
+    </div>
+    <div class="form-group">
+      <label>Login Password <span class="req">*</span></label>
+      <input type="text" id="emp_password" class="form-control" placeholder="Set a login password">
+    </div>
+    <div class="form-group">
+      <label>System Role (IAM) <span class="req">*</span></label>
+      <select id="emp_iam" class="form-control">
+        <option value="Employee">Employee (View Only)</option>
+        <option value="Manager">Manager (Project Level)</option>
+        <option value="HR">HR Admin (Full Access)</option>
+      </select>
+    </div>
+  </div>
+  <div class="grid-3">
+    <div class="form-group">
+      <label>Designation <span class="req">*</span></label>
+      <input type="text" id="emp_designation" class="form-control" placeholder="e.g. Senior Backend Developer">
+    </div>
+    <div class="form-group">
+      <label>Total Experience <span class="req">*</span></label>
+      <input type="text" id="emp_experience" class="form-control" placeholder="e.g. 5 years">
+    </div>
+    <div class="form-group">
+      <label>Joining Date <span class="req">*</span></label>
+      <input type="text" id="emp_joining_date" class="form-control" placeholder="DD/MM/YYYY">
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="form-group">
+      <label>LinkedIn URL <span class="req">*</span></label>
+      <input type="text" id="emp_linkedin" class="form-control" placeholder="https://linkedin.com/in/...">
+    </div>
+    <div class="form-group">
+      <label>GitHub / Portfolio URL <span class="req">*</span></label>
+      <input type="text" id="emp_github" class="form-control" placeholder="https://github.com/...">
+    </div>
+  </div>
+  <div class="form-group">
+    <label>Profile Summary <span class="req">*</span></label>
+    <textarea id="emp_profile_summary" class="form-control" rows="3" placeholder="A brief professional bio..."></textarea>
+  </div>
+  <div class="id-hint">🆔 Auto-assigned Employee ID: <strong>{{ next_emp_id }}</strong></div>
+</div>
+
+<!-- ── 2. MANAGER ──────────────────────────────────────────────── -->
+<div class="form-section">
+  <div class="form-section-title">🏢 2. Reporting Manager <span class="req">*</span></div>
+  <div class="form-group" style="max-width:460px">
+    <label>Search & Select Manager</label>
+    <div class="manager-search-wrap" id="managerWrap">
+      <span class="manager-search-icon">🔍</span>
+      <input
+        type="text"
+        id="managerSearch"
+        class="manager-search-input"
+        placeholder="Type to search employees..."
+        autocomplete="off"
+      >
+      <div class="manager-dropdown" id="managerDropdown">
+        <div class="no-manager-option" onclick="selectManager(null, '— No Manager —')">— No Manager —</div>
+        {% for e in all_employees %}
+        <div class="manager-option"
+             data-id="{{ e.emp_id }}"
+             data-name="{{ e.emp_name }}"
+             onclick="selectManager('{{ e.emp_id }}', '{{ e.emp_name }}{% if e.designation %} ({{ e.designation }}){% endif %}')">
+          {{ e.emp_name }}{% if e.designation %} <span style="color:var(--text-muted);font-size:12px;">({{ e.designation }})</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    <input type="hidden" id="emp_manager_id">
+    <div class="manager-selected-badge" id="managerBadge">
+      <span id="managerBadgeText"></span>
+      <button type="button" class="manager-clear-btn" onclick="clearManager()" title="Clear">✕</button>
+    </div>
+  </div>
+  <div class="section-error" id="managerError">⚠ Please select a reporting manager.</div>
+</div>
+
+<!-- ── 3. EDUCATION ─────────────────────────────────────────────── -->
+<div class="form-section">
+  <div class="form-section-title">🎓 3. Education <span class="req">*</span></div>
+  <div id="educationContainer"></div>
+  <button type="button" class="add-row-btn" id="addEduBtn" onclick="addEducation()">＋ Add Education</button>
+  <div class="section-error" id="eduError">⚠ Add at least one education entry with Degree and Institution filled.</div>
+</div>
+
+<!-- ── 4. CERTIFICATIONS ──────────────────────────────────────── -->
+<div class="form-section">
+  <div class="form-section-title">📜 4. Certifications <span class="req">*</span></div>
+  <div id="certContainer"></div>
+  <button type="button" class="add-row-btn" id="addCertBtn" onclick="addCert()">＋ Add Certification</button>
+  <div class="section-error" id="certError">⚠ Add at least one certification.</div>
+</div>
+
+<!-- ── 5. PREVIOUS EXPERIENCE ─────────────────────────────────── -->
+<div class="form-section">
+  <div class="form-section-title">💼 5. Previous Experience <span class="req">*</span></div>
+  <div id="expContainer"></div>
+  <button type="button" class="add-row-btn" id="addExpBtn" onclick="addExperience()">＋ Add Experience</button>
+  <div class="section-error" id="expError">⚠ Add at least one previous experience with Company and Role filled.</div>
+</div>
+
+<!-- ── 6. SKILLS ──────────────────────────────────────────────── -->
+<div class="form-section">
+  <div class="form-section-title">⚡ 6. Skills & Ratings <span class="req">*</span></div>
+  <p style="font-size:13px;color:var(--text-muted);margin:0 0 14px">
+    Type skill names. New skills will be created automatically. Rate each 1–5.
+  </p>
+  <div id="skillContainer"></div>
+  <button type="button" class="add-row-btn" id="addSkillBtn" onclick="addSkill()">＋ Add Skill</button>
+  <div class="section-error" id="skillError">⚠ Add at least one skill with a name and rating.</div>
+</div>
+
+<!-- ── SAVE ───────────────────────────────────────────────────── -->
+<div style="display:flex;justify-content:flex-end;margin:8px 0 48px;">
+  <button type="button" class="save-btn" id="saveBtn" onclick="saveEmployee()">💾 Save Employee</button>
+</div>
+
+<script>
+
+/* ── Manager searchable dropdown ────────────────────────────── */
+var selectedManagerId = null;
+
+var managerSearch = document.getElementById('managerSearch');
+var managerDropdown = document.getElementById('managerDropdown');
+var managerBadge = document.getElementById('managerBadge');
+var managerBadgeText = document.getElementById('managerBadgeText');
+var managerIdInput = document.getElementById('emp_manager_id');
+
+managerSearch.addEventListener('focus', function() {
+  filterManagerOptions('');
+  managerDropdown.classList.add('open');
+});
+
+managerSearch.addEventListener('input', function() {
+  filterManagerOptions(this.value);
+  managerDropdown.classList.add('open');
+});
+
+document.addEventListener('click', function(e) {
+  if (!document.getElementById('managerWrap').contains(e.target)) {
+    managerDropdown.classList.remove('open');
+  }
+});
+
+function filterManagerOptions(q) {
+  var opts = managerDropdown.querySelectorAll('.manager-option');
+  var lq = q.toLowerCase();
+  opts.forEach(function(opt) {
+    var name = (opt.dataset.name || '').toLowerCase();
+    opt.style.display = (!q || name.includes(lq)) ? '' : 'none';
+  });
+}
+
+function selectManager(id, label) {
+  selectedManagerId = id;
+  managerIdInput.value = id || '';
+  managerSearch.value = '';
+  managerDropdown.classList.remove('open');
+  if (id) {
+    managerBadgeText.textContent = label;
+    managerBadge.classList.add('show');
+  } else {
+    managerBadge.classList.remove('show');
+  }
+  document.getElementById('managerError').classList.remove('show');
+}
+
+function clearManager() {
+  selectedManagerId = null;
+  managerIdInput.value = '';
+  managerBadge.classList.remove('show');
+  managerSearch.value = '';
+}
+
+/* ── Education ──────────────────────────────────────────────── */
+var eduCount = 0;
+function addEducation() {
+  var idx = eduCount++;
+  var container = document.getElementById('educationContainer');
+  var div = document.createElement('div');
+  div.className = 'dynamic-row';
+  div.id = 'edu-' + idx;
+  div.innerHTML =
+    '<button type="button" class="remove-row-btn" onclick="removeRow(\'edu-' + idx + '\')" title="Remove">✕</button>' +
+    '<div class="edu-grid">' +
+      '<div class="form-group" style="margin-bottom:0"><label>Degree <span class="req">*</span></label>' +
+        '<input type="text" class="form-control edu-degree" placeholder="e.g. B.Tech"></div>' +
+      '<div class="form-group" style="margin-bottom:0"><label>Field of Study <span class="req">*</span></label>' +
+        '<input type="text" class="form-control edu-field" placeholder="e.g. Computer Science"></div>' +
+      '<div class="form-group" style="margin-bottom:0"><label>Institution <span class="req">*</span></label>' +
+        '<input type="text" class="form-control edu-inst" placeholder="e.g. IIT Bombay"></div>' +
+    '</div>' +
+    '<div class="edu-grid-2">' +
+      '<div class="form-group" style="margin-bottom:0"><label>Graduation Year <span class="req">*</span></label>' +
+        '<input type="number" class="form-control edu-year" placeholder="e.g. 2020" min="1950" max="2099"></div>' +
+      '<div class="form-group" style="margin-bottom:0"><label>CGPA / Percentage <span class="req">*</span></label>' +
+        '<input type="number" class="form-control edu-cgpa" placeholder="e.g. 8.7" min="0" max="100" step="0.01"></div>' +
+    '</div>';
+  container.appendChild(div);
+  document.getElementById('eduError').classList.remove('show');
+}
+
+/* ── Certifications ─────────────────────────────────────────── */
+var certCount = 0;
+function addCert() {
+  var idx = certCount++;
+  var container = document.getElementById('certContainer');
+  var div = document.createElement('div');
+  div.className = 'dynamic-row';
+  div.id = 'cert-' + idx;
+  div.innerHTML =
+    '<div class="cert-grid">' +
+      '<div class="form-group" style="margin-bottom:0"><label>Certification Name <span class="req">*</span></label>' +
+        '<input type="text" class="form-control cert-name" placeholder="e.g. AWS Certified Solutions Architect"></div>' +
+      '<button type="button" class="remove-row-btn" style="position:static;margin-top:24px" onclick="removeRow(\'cert-' + idx + '\')" title="Remove">✕</button>' +
+    '</div>';
+  container.appendChild(div);
+  document.getElementById('certError').classList.remove('show');
+}
+
+/* ── Previous Experience ────────────────────────────────────── */
+var expCount = 0;
+function addExperience() {
+  var idx = expCount++;
+  var container = document.getElementById('expContainer');
+  var div = document.createElement('div');
+  div.className = 'dynamic-row';
+  div.id = 'exp-' + idx;
+  div.innerHTML =
+    '<button type="button" class="remove-row-btn" onclick="removeRow(\'exp-' + idx + '\')" title="Remove">✕</button>' +
+    '<div class="exp-grid">' +
+      '<div class="form-group" style="margin-bottom:0"><label>Company <span class="req">*</span></label>' +
+        '<input type="text" class="form-control exp-company" placeholder="e.g. Infosys"></div>' +
+      '<div class="form-group" style="margin-bottom:0"><label>Role / Title <span class="req">*</span></label>' +
+        '<input type="text" class="form-control exp-role" placeholder="e.g. Software Engineer"></div>' +
+      '<div class="form-group" style="margin-bottom:0"><label>Duration <span class="req">*</span></label>' +
+        '<input type="text" class="form-control exp-duration" placeholder="e.g. Jan 2019 – Mar 2021"></div>' +
+    '</div>' +
+    '<div class="form-group" style="margin-bottom:0"><label>Description <span class="req">*</span></label>' +
+      '<textarea class="form-control exp-desc" rows="2" placeholder="Brief summary of responsibilities..."></textarea></div>';
+  container.appendChild(div);
+  document.getElementById('expError').classList.remove('show');
+}
+
+/* ── Skills ─────────────────────────────────────────────────── */
+var skillCount = 0;
+function addSkill() {
+  var idx = skillCount++;
+  var container = document.getElementById('skillContainer');
+  var div = document.createElement('div');
+  div.className = 'dynamic-row';
+  div.id = 'skill-' + idx;
+  div.innerHTML =
+    '<div class="skill-grid">' +
+      '<div class="form-group" style="margin-bottom:0"><label>Skill Name <span class="req">*</span></label>' +
+        '<input type="text" class="form-control skill-name" placeholder="e.g. Python, React, AWS..." autocomplete="off"></div>' +
+      '<div class="form-group" style="margin-bottom:0"><label>Rating (1–5) <span class="req">*</span></label>' +
+        '<input type="number" class="form-control skill-rating" placeholder="e.g. 4" min="1" max="5" step="0.1"></div>' +
+      '<button type="button" class="remove-row-btn" style="position:static;margin-top:24px" onclick="removeRow(\'skill-' + idx + '\')" title="Remove">✕</button>' +
+    '</div>';
+  container.appendChild(div);
+  document.getElementById('skillError').classList.remove('show');
+}
+
+/* ── Generic remove ─────────────────────────────────────────── */
+function removeRow(id) {
+  var el = document.getElementById(id);
+  if (el) {
+    el.style.opacity = '0';
+    el.style.transform = 'scale(0.97)';
+    el.style.transition = 'opacity 0.15s, transform 0.15s';
+    setTimeout(function() { el.remove(); }, 150);
+  }
+}
+
+/* ── Validation helper ──────────────────────────────────────── */
+function markField(el, valid) {
+  if (valid) { el.classList.remove('is-invalid'); }
+  else { el.classList.add('is-invalid'); }
+  return valid;
+}
+
+/* ── Save ───────────────────────────────────────────────────── */
+async function saveEmployee() {
+  var ok = true;
+
+  /* Basic info */
+  var nameEl   = document.getElementById('emp_name');
+  var emailEl  = document.getElementById('emp_email');
+  var passEl   = document.getElementById('emp_password');
+  var desigEl  = document.getElementById('emp_designation');
+  var expEl    = document.getElementById('emp_experience');
+  var dateEl   = document.getElementById('emp_joining_date');
+  var liEl     = document.getElementById('emp_linkedin');
+  var ghEl     = document.getElementById('emp_github');
+  var sumEl    = document.getElementById('emp_profile_summary');
+
+  if (!markField(nameEl,  nameEl.value.trim()))  ok = false;
+  if (!markField(emailEl, emailEl.value.trim()))  ok = false;
+  if (!markField(passEl,  passEl.value.trim()))   ok = false;
+  if (!markField(desigEl, desigEl.value.trim()))  ok = false;
+  if (!markField(expEl,   expEl.value.trim()))    ok = false;
+  if (!markField(dateEl,  dateEl.value.trim()))   ok = false;
+  if (!markField(liEl,    liEl.value.trim()))     ok = false;
+  if (!markField(ghEl,    ghEl.value.trim()))     ok = false;
+  if (!markField(sumEl,   sumEl.value.trim()))    ok = false;
+
+  /* Manager */
+  if (!selectedManagerId) {
+    document.getElementById('managerError').classList.add('show');
+    ok = false;
+  } else {
+    document.getElementById('managerError').classList.remove('show');
+  }
+
+  /* Education — at least one row, all fields filled */
+  var eduRows = document.querySelectorAll('#educationContainer .dynamic-row');
+  var eduOk = eduRows.length > 0;
+  eduRows.forEach(function(row) {
+    var d = row.querySelector('.edu-degree');
+    var f = row.querySelector('.edu-field');
+    var i = row.querySelector('.edu-inst');
+    var y = row.querySelector('.edu-year');
+    var c = row.querySelector('.edu-cgpa');
+    if (!markField(d, d.value.trim())) eduOk = false;
+    if (!markField(f, f.value.trim())) eduOk = false;
+    if (!markField(i, i.value.trim())) eduOk = false;
+    if (!markField(y, y.value.trim())) eduOk = false;
+    if (!markField(c, c.value.trim())) eduOk = false;
+  });
+  if (!eduOk) { document.getElementById('eduError').classList.add('show'); ok = false; }
+  else { document.getElementById('eduError').classList.remove('show'); }
+
+  /* Certifications — at least one */
+  var certInputs = document.querySelectorAll('#certContainer .cert-name');
+  var certOk = certInputs.length > 0;
+  certInputs.forEach(function(inp) {
+    if (!markField(inp, inp.value.trim())) certOk = false;
+  });
+  if (!certOk) { document.getElementById('certError').classList.add('show'); ok = false; }
+  else { document.getElementById('certError').classList.remove('show'); }
+
+  /* Experience — at least one row, company/role/duration/desc filled */
+  var expRows = document.querySelectorAll('#expContainer .dynamic-row');
+  var expSecOk = expRows.length > 0;
+  expRows.forEach(function(row) {
+    var co = row.querySelector('.exp-company');
+    var ro = row.querySelector('.exp-role');
+    var du = row.querySelector('.exp-duration');
+    var de = row.querySelector('.exp-desc');
+    if (!markField(co, co.value.trim())) expSecOk = false;
+    if (!markField(ro, ro.value.trim())) expSecOk = false;
+    if (!markField(du, du.value.trim())) expSecOk = false;
+    if (!markField(de, de.value.trim())) expSecOk = false;
+  });
+  if (!expSecOk) { document.getElementById('expError').classList.add('show'); ok = false; }
+  else { document.getElementById('expError').classList.remove('show'); }
+
+  /* Skills — at least one row, name + rating filled */
+  var skillRows = document.querySelectorAll('#skillContainer .dynamic-row');
+  var skillOk = skillRows.length > 0;
+  skillRows.forEach(function(row) {
+    var sn = row.querySelector('.skill-name');
+    var sr = row.querySelector('.skill-rating');
+    if (!markField(sn, sn.value.trim())) skillOk = false;
+    if (!markField(sr, sr.value.trim())) skillOk = false;
+  });
+  if (!skillOk) { document.getElementById('skillError').classList.add('show'); ok = false; }
+  else { document.getElementById('skillError').classList.remove('show'); }
+
+  if (!ok) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
+  }
+
+  /* Collect data */
+  var educations = [];
+  eduRows.forEach(function(row) {
+    educations.push({
+      degree:             row.querySelector('.edu-degree').value.trim(),
+      field_of_study:     row.querySelector('.edu-field').value.trim(),
+      institution:        row.querySelector('.edu-inst').value.trim(),
+      graduation_year:    row.querySelector('.edu-year').value,
+      cgpa_or_percentage: row.querySelector('.edu-cgpa').value,
+    });
+  });
+
+  var certifications = [];
+  certInputs.forEach(function(inp) {
+    if (inp.value.trim()) certifications.push({ cert_name: inp.value.trim() });
+  });
+
+  var previous_experiences = [];
+  expRows.forEach(function(row) {
+    previous_experiences.push({
+      company_name: row.querySelector('.exp-company').value.trim(),
+      role:         row.querySelector('.exp-role').value.trim(),
+      duration:     row.querySelector('.exp-duration').value.trim(),
+      description:  row.querySelector('.exp-desc').value.trim(),
+    });
+  });
+
+  var skills = [];
+  skillRows.forEach(function(row) {
+    var sn = row.querySelector('.skill-name').value.trim();
+    var sr = row.querySelector('.skill-rating').value;
+    if (sn) skills.push({ skill_name: sn, rating: sr ? parseFloat(sr) : null });
+  });
+
+  var payload = {
+    emp_name:             nameEl.value.trim(),
+    password:             passEl.value.trim(),
+    IAM:                  document.getElementById('emp_iam') ? document.getElementById('emp_iam').value : 'Employee',
+    email:                emailEl.value.trim(),
+    designation:          desigEl.value.trim(),
+    experience:           expEl.value.trim(),
+    joining_date:         dateEl.value.trim(),
+    linkedin_url:         liEl.value.trim(),
+    github_portfolio_url: ghEl.value.trim(),
+    profile_summary:      sumEl.value.trim(),
+    manager_id:           selectedManagerId || null,
+    educations:           educations,
+    certifications:       certifications,
+    previous_experiences: previous_experiences,
+    skills:               skills,
+  };
+
+  var btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Saving...';
+
+  try {
+    var res = await fetch("{% url 'records:add_employee' %}", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': '{{ csrf_token }}'
+      },
+      body: JSON.stringify(payload)
+    });
+    var data = await res.json();
+    if (data.success) {
+      window.location.href = '/employees/' + data.emp_id + '/';
+    } else {
+      alert('Error saving employee: ' + data.error);
+      btn.disabled = false;
+      btn.innerHTML = '💾 Save Employee';
+    }
+  } catch(err) {
+    alert('Request failed: ' + err);
+    btn.disabled = false;
+    btn.innerHTML = '💾 Save Employee';
+  }
+}
+</script>
+{% endblock %}

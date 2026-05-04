@@ -1,0 +1,162 @@
+{% extends "records/base.html" %}
+{% block title %}{{ project.project_name }} — Office Records{% endblock %}
+{% block page_title %}{{ project.project_name }}{% endblock %}
+{% block page_sub %}Project Details{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'records:project_list' %}" class="btn btn-secondary">← All Projects</a>
+{% if user_iam == 'Manager' and is_project_manager or user_iam == 'HR' %}
+<a href="{% url 'records:edit_project' project.project_id %}" class="btn btn-primary" style="margin-left: 8px;">✎ Edit</a>
+{% endif %}
+{% if user_iam == 'HR' %}
+<form action="{% url 'records:delete_project' project.project_id %}" method="POST" style="display:inline; margin-left: 8px;" onsubmit="return confirm('Are you sure you want to delete this project? This will erase all AI summaries and recalculate skill averages permanently.');">
+  {% csrf_token %}
+  <button type="submit" class="btn" style="background:#f85149;color:white;border:none;cursor:pointer;padding:8px 16px;border-radius:var(--radius-sm);font-weight:600;">🗑 Delete</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Project Overview ───────────────────────────────── -->
+<div class="card mb-24" style="background:linear-gradient(135deg,rgba(88,166,255,0.06),rgba(188,140,255,0.06));position:relative;overflow:hidden">
+  <div style="position:absolute;top:-50px;right:-50px;width:200px;height:200px;background:radial-gradient(circle,rgba(88,166,255,0.1) 0%,transparent 70%)"></div>
+
+  <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;font-weight:500;display:flex;align-items:center;gap:12px">
+    Project #{{ project.project_id }}
+    {% if project.status %}
+    <span class="badge {% if project.status == 'Active' %}badge-green{% elif project.status == 'Completed' %}badge-blue{% elif project.status == 'On Hold' %}badge-orange{% else %}badge-red{% endif %}" style="font-size:12px">
+      {% if project.status == 'Active' %}● {% elif project.status == 'Completed' %}✓ {% endif %}{{ project.status }}
+    </span>
+    {% endif %}
+  </div>
+  <h1 style="font-size:26px;font-weight:800;margin-bottom:16px">{{ project.project_name }}</h1>
+
+  {% if project.description %}
+  <p style="font-size:14px;color:var(--text-secondary);line-height:1.8;max-width:800px;margin-bottom:20px">
+    {{ project.description }}
+  </p>
+  {% endif %}
+
+  <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+    <div class="ps-item">
+      <span class="ps-value">{{ works|length }}</span>
+      <span class="ps-label">Team Members</span>
+    </div>
+    <div class="ps-item">
+      <span class="ps-value">{{ tech_stack|length }}</span>
+      <span class="ps-label">Technologies</span>
+    </div>
+    {% if project.get_managers %}
+    <div class="ps-item" style="border-left: 1px solid var(--border); padding-left: 24px;">
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        {% for m in project.get_managers %}
+        <span class="ps-value" style="font-size:15px; line-height:1.2;">{{ m.emp_name }}</span>
+        {% endfor %}
+      </div>
+      <span class="ps-label" style="margin-top:6px; display:inline-block;">Project Manager(s)</span>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Tech Stack ─────────────────────────────────────── -->
+{% if tech_stack %}
+<div class="card mb-24">
+  <div class="card-title mb-16">🔧 Tech Stack</div>
+  <div class="tags">
+    {% for pt in tech_stack %}
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:12px 20px;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:100px">
+      <span style="font-size:20px">
+        {% if 'python' in pt.skill.skill_name|lower %}🐍
+        {% elif 'fastapi' in pt.skill.skill_name|lower or 'api' in pt.skill.skill_name|lower %}⚡
+        {% elif 'docker' in pt.skill.skill_name|lower %}🐳
+        {% elif 'gemini' in pt.skill.skill_name|lower or 'ai' in pt.skill.skill_name|lower or 'llm' in pt.skill.skill_name|lower %}🤖
+        {% elif 'cloud' in pt.skill.skill_name|lower %}☁️
+        {% elif 'vertex' in pt.skill.skill_name|lower %}🔷
+        {% else %}⚙️
+        {% endif %}
+      </span>
+      <span style="font-size:12px;font-weight:600;color:var(--text-primary)">{{ pt.skill.skill_name }}</span>
+      <span style="font-size:10px;color:var(--text-muted)">{{ pt.skill.category }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Team & Work Details ────────────────────────────── -->
+<div class="card">
+  <div class="card-title mb-16">👥 Team Contributions</div>
+
+  {% for item in works_with_access %}
+  {% with work=item.work sa_list=item.skill_analyses show_rating=item.show_rating %}
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:20px;margin-bottom:16px;transition:var(--transition)" onmouseover="this.style.borderColor='var(--accent-blue)'" onmouseout="this.style.borderColor='var(--border)'">
+
+    <!-- Employee Header -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <a href="{% url 'records:employee_detail' work.employee.emp_id %}">
+        <div class="avatar" style="width:44px;height:44px;font-size:15px;background:linear-gradient(135deg,{% cycle '#58a6ff,#bc8cff' '#3fb950,#39d4d1' '#bc8cff,#58a6ff' %})">
+          {{ work.employee.get_initials }}
+        </div>
+      </a>
+      <div style="flex:1">
+        <a href="{% url 'records:employee_detail' work.employee.emp_id %}" style="font-size:15px;font-weight:700;color:var(--text-primary);text-decoration:none">
+          {{ work.employee.emp_name }}
+        </a>
+        <div style="font-size:12px;color:var(--accent-blue)">{{ work.employee.designation }}</div>
+      </div>
+      <span class="badge badge-orange">{{ work.role_in_project }}</span>
+    </div>
+
+    <!-- Work Summary -->
+    {% if work.work_summary %}
+    <p style="font-size:13px;color:var(--text-secondary);line-height:1.7;margin-bottom:14px">{{ work.work_summary }}</p>
+    {% endif %}
+
+    <!-- Skill Analysis -->
+    {% if sa_list %}
+    <div style="background:var(--bg-card);border-radius:8px;padding:16px">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:14px;font-weight:600">Skill Analysis</div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        {% for sa in sa_list %}
+        <div>
+          <div class="skill-bar-header">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="skill-bar-name">{{ sa.skill.skill_name }}</span>
+              <span class="badge badge-purple" style="font-size:10px">{{ sa.skill.category }}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="star-rating">
+                {% for i in "12345" %}
+                <span class="star {% if forloop.counter <= sa.rating|floatformat:'0' %}filled{% endif %}">★</span>
+                {% endfor %}
+              </div>
+              <span class="skill-bar-rating">{{ sa.rating }}/5</span>
+            </div>
+          </div>
+          <div class="skill-bar-bg">
+            <div class="skill-bar-fill green" data-pct="{% widthratio sa.rating 5 100 %}"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% elif not show_rating and work.skill_analyses.exists %}
+    <div style="background:var(--bg-card);border-radius:8px;padding:16px;text-align:center;">
+      <span class="badge" style="background:var(--bg-secondary);color:var(--text-muted);">🔒 Skill ratings hidden</span>
+    </div>
+    {% endif %}
+
+  </div>
+  {% endwith %}
+  {% empty %}
+  <div class="empty-state">
+    <div class="empty-state-icon">👥</div>
+    <div class="empty-state-text">No team members assigned.</div>
+  </div>
+  {% endfor %}
+
+</div>
+
+{% endblock %}

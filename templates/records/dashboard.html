@@ -1,0 +1,150 @@
+{% extends "records/base.html" %}
+{% block title %}Dashboard — Office Records{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_sub %}Overview of your team and records{% endblock %}
+
+{% block content %}
+
+<!-- ── Stat Cards ─────────────────────────────────────── -->
+<div class="stats-grid mb-32">
+  <div class="stat-card blue">
+    <div class="stat-icon blue">👥</div>
+    <div class="stat-body">
+      <div class="stat-value">{{ total_employees }}</div>
+      <div class="stat-label">Total Employees</div>
+    </div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-icon green">📁</div>
+    <div class="stat-body">
+      <div class="stat-value">{{ total_projects }}</div>
+      <div class="stat-label">Active Projects</div>
+    </div>
+  </div>
+  <div class="stat-card purple">
+    <div class="stat-icon purple">⚡</div>
+    <div class="stat-body">
+      <div class="stat-value">{{ total_skills }}</div>
+      <div class="stat-label">Skills Tracked</div>
+    </div>
+  </div>
+  <div class="stat-card orange">
+    <div class="stat-icon orange">🏆</div>
+    <div class="stat-body">
+      <div class="stat-value">{{ designation_stats|length }}</div>
+      <div class="stat-label">Designations</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Row 1 ──────────────────────────────────────────── -->
+<div class="grid-2 mb-24">
+
+  <!-- Team Members -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">👥 Team Members</span>
+      <a href="{% url 'records:employee_list' %}" class="btn btn-ghost" style="font-size:12px">View All →</a>
+    </div>
+    {% for emp in recent_employees %}
+    <a href="{% url 'records:employee_detail' emp.emp_id %}" style="text-decoration:none; display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); transition:all 0.2s;" onmouseover="this.style.paddingLeft='8px'" onmouseout="this.style.paddingLeft='0'">
+      <div class="avatar avatar-colors-{{ forloop.counter0|divisibleby:5|yesno:'0,1' }}" style="width:40px;height:40px;font-size:14px; background: linear-gradient(135deg,
+        {% cycle '#58a6ff' '#3fb950' '#bc8cff' '#f0883e' '#39d4d1' %},
+        {% cycle '#bc8cff' '#39d4d1' '#58a6ff' '#f85149' '#3fb950' %})">
+        {{ emp.get_initials }}
+      </div>
+      <div style="flex:1">
+        <div style="font-size:13.5px;font-weight:600;color:var(--text-primary)">{{ emp.emp_name }}</div>
+        <div style="font-size:12px;color:var(--accent-blue)">{{ emp.designation }}</div>
+      </div>
+      <span class="badge badge-blue">{{ emp.experience }}</span>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Designations Breakdown -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">🏷️ By Designation</span>
+    </div>
+    {% for item in designation_stats %}
+    <div class="skill-bar-wrap">
+      <div class="skill-bar-header">
+        <span class="skill-bar-name">{{ item.designation }}</span>
+        <span class="skill-bar-rating">{{ item.count }} employee{{ item.count|pluralize }}</span>
+      </div>
+      <div class="skill-bar-bg">
+        <div class="skill-bar-fill" data-pct="{% widthratio item.count total_employees 100 %}"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ── Row 2 ──────────────────────────────────────────── -->
+<div class="grid-2 mb-24">
+
+  <!-- Projects -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">📁 Projects</span>
+      <a href="{% url 'records:project_list' %}" class="btn btn-ghost" style="font-size:12px">View All →</a>
+    </div>
+    {% for proj in projects %}
+    <a href="{% url 'records:project_detail' proj.project_id %}" style="text-decoration:none;display:block;padding:12px;background:var(--bg-secondary);border-radius:8px;margin-bottom:10px;border:1px solid var(--border);transition:all 0.2s;" onmouseover="this.style.borderColor='var(--accent-blue)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:14px;font-weight:600;color:var(--text-primary)">{{ proj.project_name }}</span>
+        <div>
+          {% if proj.status %}
+          <span class="badge {% if proj.status == 'Active' %}badge-green{% elif proj.status == 'Completed' %}badge-purple{% elif proj.status == 'On Hold' %}badge-orange{% else %}badge-red{% endif %}" style="margin-right:6px">
+            {{ proj.status }}
+          </span>
+          {% endif %}
+          <span class="badge badge-blue" style="border: 1px solid rgba(88,166,255,0.3)">{{ proj.team_size }} member{{ proj.team_size|pluralize }}</span>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ proj.description }}</div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Top Skills -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">⚡ Top Skills</span>
+      <a href="{% url 'records:skills' %}" class="btn btn-ghost" style="font-size:12px">View All →</a>
+    </div>
+    {% for s in top_skills %}
+    <div class="skill-bar-wrap">
+      <div class="skill-bar-header">
+        <div>
+          <span class="skill-bar-name">{{ s.skill__skill_name }}</span>
+          <span class="badge badge-purple" style="margin-left:6px;font-size:10px">{{ s.skill__category }}</span>
+        </div>
+        <span class="skill-bar-rating">{{ s.avg_rating }}/5</span>
+      </div>
+      <div class="skill-bar-bg">
+        <div class="skill-bar-fill green" data-pct="{% widthratio s.avg_rating 5 100 %}"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+
+<!-- ── Skill Categories ───────────────────────────────── -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">📊 Skill Categories</span>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:12px">
+    {% for cat in skill_categories %}
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:16px 24px;text-align:center;min-width:140px">
+      <div style="font-size:24px;font-weight:800;color:var(--accent-blue)">{{ cat.count }}</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:4px">{{ cat.category }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock %}

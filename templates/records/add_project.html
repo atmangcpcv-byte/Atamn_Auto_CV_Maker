@@ -1,0 +1,501 @@
+{% extends "records/base.html" %}
+{% block title %}Add Project — Office Records{% endblock %}
+{% block page_title %}Create New Project{% endblock %}
+{% block page_sub %}Use AI to automatically build tech stacks and work summaries{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'records:project_list' %}" class="btn btn-secondary">← Back to Projects</a>
+{% endblock %}
+
+{% block content %}
+<style>
+  .form-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  .form-section-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+  }
+  .form-group {
+    margin-bottom: 16px;
+  }
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .form-control {
+    width: 100%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+  }
+  .form-control:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(88,166,255,0.2);
+  }
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+  }
+  .table th, .table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    font-size: 14px;
+  }
+  .table th {
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 12px;
+    text-transform: uppercase;
+  }
+  .ai-generate-btn {
+    background: linear-gradient(135deg, #bc8cff, #58a6ff);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: var(--radius-sm);
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ai-generate-btn:hover {
+    opacity: 0.9;
+  }
+  .ai-generate-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .tech-stack-container, .emp-summary-card {
+    background: rgba(88,166,255,0.05);
+    border: 1px solid rgba(88,166,255,0.2);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .skill-badge {
+    background: rgba(188,140,255,0.15);
+    color: #bc8cff;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid rgba(188,140,255,0.3);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .remove-btn {
+    background: none;
+    border: none;
+    color: var(--accent-red);
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+  }
+</style>
+
+<div class="form-section">
+  <div class="form-section-title">1. Basic Details</div>
+  <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:16px">
+    <div class="form-group">
+      <label>Project Name</label>
+      <input type="text" id="p_name" class="form-control" placeholder="e.g. NextGen AI Platform">
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="p_status" class="form-control">
+        <option value="Active">Active</option>
+        <option value="Completed">Completed</option>
+        <option value="On Hold">On Hold</option>
+        <option value="Cancelled">Cancelled</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Project Manager(s) <span style="font-weight:normal;color:var(--text-muted);font-size:11px;">(Hold Ctrl to multi-select)</span></label>
+      <select id="p_manager" class="form-control" multiple style="height: 80px;" required>
+        {% for e in employees %}
+        <option value="{{ e.emp_id }}">{{ e.emp_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="form-group">
+    <label>Description</label>
+    <textarea id="p_desc" class="form-control" rows="3" placeholder="Briefly describe the project goals..."></textarea>
+  </div>
+  <div class="form-group">
+    <label>Tech Stack</label>
+    <input type="text" id="p_tech_stack" class="form-control" placeholder="Comma-separated (e.g. Python, Docker, React)">
+  </div>
+</div>
+
+<div class="form-section">
+  <div class="form-section-title">2. Assemble Team</div>
+  <div style="display:flex;gap:12px;align-items:flex-end">
+    <div class="form-group" style="flex:1;margin-bottom:0">
+      <label>Search Employee</label>
+      <input type="text" list="emp_list" id="emp_search" class="form-control" placeholder="Start typing a name..." autocomplete="off">
+      <datalist id="emp_list">
+        <!-- Fetched via api_get_employees -->
+      </datalist>
+    </div>
+    <div class="form-group" style="flex:1;margin-bottom:0">
+      <label>Role</label>
+      <input type="text" id="emp_role" class="form-control" placeholder="e.g. Backend Developer">
+    </div>
+    <div class="form-group" style="width:120px;margin-bottom:0">
+      <label>Utilization %</label>
+      <input type="number" id="emp_utilization" class="form-control" placeholder="e.g. 50" min="0" max="100" step="1">
+    </div>
+    <button type="button" class="btn btn-primary" onclick="addEmployee()" style="height:41px">Add Member</button>
+  </div>
+
+  <table class="table" id="team_table" style="display:none">
+    <thead>
+      <tr>
+        <th>Employee</th>
+        <th>Role</th>
+        <th>Current Util</th>
+        <th>Project Util</th>
+        <th>Expected Total</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<div style="text-align:center;margin:32px 0">
+  <button type="button" class="ai-generate-btn" id="generateBtn" onclick="generateAI()" style="margin:0 auto">
+    ✨ Generate Details using AI
+  </button>
+  <div id="aiLoading" style="display:none;margin-top:16px;color:var(--text-muted);font-size:14px">
+    🤖 AI is analyzing and generating summaries... Please wait (est. 10-15s)
+  </div>
+</div>
+
+<div id="ai_results" style="display:none">
+  <div class="form-section border-purple">
+    <div class="form-section-title">3. Generated Employee Summaries</div>
+    <div id="emp_summaries_container"></div>
+
+    <div style="margin-top:32px;display:flex;justify-content:flex-end">
+      <button type="button" class="btn btn-primary" id="saveBtn" onclick="saveProject()" style="padding:12px 32px;font-size:16px">
+        💾 Save Project
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let team = [];
+  let generatedData = null;
+  let employees_data_source = [];
+
+  // Fetch employee data securely on load
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      const res = await fetch('/api/employees/');
+      employees_data_source = await res.json();
+      populateEmployeeDataList();
+    } catch (e) {
+      console.error("Failed to fetch employees list.", e);
+    }
+  });
+
+  function populateEmployeeDataList() {
+    const dataList = document.getElementById('emp_list');
+    dataList.innerHTML = '';
+    employees_data_source.forEach(e => {
+        const opt = document.createElement('option');
+        opt.dataset.id = e.emp_id;
+        opt.dataset.name = e.emp_name;
+        opt.dataset.util = e.total_utilization || 0;
+        opt.value = `${e.emp_name} (${e.designation || ''})`;
+        dataList.appendChild(opt);
+    });
+  }
+
+  function addEmployee() {
+    const searchInput = document.getElementById('emp_search');
+    const roleInput = document.getElementById('emp_role');
+    const utilizationInput = document.getElementById('emp_utilization');
+    const role = roleInput.value.trim();
+    const utilization = parseFloat(utilizationInput.value) || 0;
+    const val = searchInput.value;
+
+    const list = document.getElementById('emp_list');
+    let empId = null;
+    let empName = null;
+    let currentUtil = 0;
+    for (let opt of list.options) {
+      if (opt.value === val) {
+        empId = opt.dataset.id;
+        empName = opt.dataset.name;
+        currentUtil = parseFloat(opt.dataset.util) || 0;
+        break;
+      }
+    }
+
+    if (!empId || !role) {
+      alert('Please select a valid employee from the search list and specify their role.');
+      return;
+    }
+    if (team.some(t => t.emp_id == empId)) {
+      alert('Employee is already added.');
+      return;
+    }
+
+    team.push({ emp_id: parseInt(empId), emp_name: empName, role: role, utilization: utilization, current_util: currentUtil });
+    searchInput.value = '';
+    roleInput.value = '';
+    utilizationInput.value = '';
+    renderTeam();
+  }
+
+  function removeEmployee(id) {
+    team = team.filter(t => t.emp_id !== id);
+    renderTeam();
+  }
+
+  function renderTeam() {
+    const tbody = document.querySelector('#team_table tbody');
+    const table = document.getElementById('team_table');
+    tbody.innerHTML = '';
+    if (team.length === 0) {
+      table.style.display = 'none';
+      return;
+    }
+    table.style.display = 'table';
+    team.forEach(t => {
+      const tr = document.createElement('tr');
+      const expectedTotal = t.current_util + t.utilization;
+      const utilizationColor = expectedTotal < 25 ? 'var(--accent-red)' : expectedTotal <= 50 ? '#e3a008' : 'var(--accent-green)';
+      tr.innerHTML = `
+        <td style="font-weight:600;color:var(--text-primary)">${t.emp_name}</td>
+        <td>${t.role}</td>
+        <td><span style="font-size:13px;color:var(--text-muted);font-weight:600;">${t.current_util}%</span></td>
+        <td><span style="font-size:13px;color:var(--text-primary);">${t.utilization}%</span></td>
+        <td><span style="background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);border-radius:6px;padding:3px 10px;font-size:13px;font-weight:700;color:${utilizationColor}">${expectedTotal}%</span></td>
+        <td><button class="remove-btn" onclick="removeEmployee(${t.emp_id})">✕</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function generateAI() {
+    const p_name = document.getElementById('p_name').value.trim();
+    const p_desc = document.getElementById('p_desc').value.trim();
+    const tech_stack_str = document.getElementById('p_tech_stack').value.trim();
+    const p_tech_stack = tech_stack_str ? tech_stack_str.split(',').map(s=>s.trim()).filter(s=>s) : [];
+    const managerSelect = document.getElementById('p_manager');
+    const p_managers = Array.from(managerSelect.selectedOptions).map(o => o.value);
+
+    if (!p_name || !p_desc) {
+      alert("Please enter the Project Name and Description.");
+      return;
+    }
+    if (p_managers.length === 0) {
+      alert("Please select at least one Project Manager.");
+      return;
+    }
+    if (team.length === 0) {
+      alert("Please add at least one team member.");
+      return;
+    }
+
+    const payload = {
+      project_name: p_name,
+      description: p_desc,
+      tech_stack: p_tech_stack,
+      employees: team
+    };
+
+    document.getElementById('generateBtn').disabled = true;
+    document.getElementById('aiLoading').style.display = 'block';
+    document.getElementById('ai_results').style.display = 'none';
+
+    try {
+      const csrfToken = '{{ csrf_token }}';
+      const res = await fetch("{% url 'records:generate_project_ai' %}", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        generatedData = data.data;
+        renderGeneratedData();
+        document.getElementById('ai_results').style.display = 'block';
+      } else {
+        alert("AI Generation failed: " + data.error);
+      }
+    } catch(err) {
+      alert("Error: " + err);
+    } finally {
+      document.getElementById('generateBtn').disabled = false;
+      document.getElementById('aiLoading').style.display = 'none';
+    }
+  }
+
+  function renderGeneratedData() {
+    document.getElementById('p_tech_stack').value = generatedData.project_tech_stack.join(', ');
+
+    const container = document.getElementById('emp_summaries_container');
+    container.innerHTML = '';
+
+    generatedData.employee_summaries.forEach((empSum, i) => {
+      const empInfo = team.find(t => t.emp_id === empSum.emp_id);
+      if (!empInfo) return;
+
+      const card = document.createElement('div');
+      card.className = 'emp-summary-card';
+      
+      let skillsHtml = empSum.skills.map((s, j) => `
+        <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center" class="skill-row">
+          <input type="text" class="form-control" value="${s.skill_name}" style="flex:2" data-skill-idx="${i}-${j}-name">
+          <input type="number" class="form-control" value="${s.rating}" min="1" max="5" step="0.1" style="flex:1" data-skill-idx="${i}-${j}-rating">
+          <button type="button" class="remove-btn" onclick="this.parentElement.remove()">✕</button>
+        </div>
+      `).join('');
+
+      card.innerHTML = `
+        <h4 style="margin-bottom:12px;color:var(--text-primary);font-size:15px">${empInfo.emp_name} <span style="font-weight:normal;color:var(--text-muted)">(${empInfo.role})</span></h4>
+        <div class="form-group">
+          <label>Work Summary</label>
+          <textarea class="form-control emp-summary-text" data-empid="${empSum.emp_id}" rows="2">${empSum.work_summary}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Skills Utilized & Suggested Rating (1-5)</label>
+          <div class="skills-wrapper" data-empid="${empSum.emp_id}">
+            ${skillsHtml}
+          </div>
+          <button type="button" class="btn btn-secondary" style="margin-top:8px;padding:4px 10px;font-size:12px" onclick="addBlankSkill(this, ${empSum.emp_id})">+ Add Skill</button>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  function addBlankSkill(btn, empId) {
+    const wrapper = btn.previousElementSibling;
+    const row = document.createElement('div');
+    row.style = "display:flex;gap:8px;margin-bottom:8px;align-items:center";
+    row.className = 'skill-row';
+    row.innerHTML = `
+      <input type="text" class="form-control" placeholder="Skill Name" style="flex:2">
+      <input type="number" class="form-control" placeholder="Rating (1-5)" min="1" max="5" step="0.1" style="flex:1">
+      <button type="button" class="remove-btn" onclick="this.parentElement.remove()">✕</button>
+    `;
+    wrapper.appendChild(row);
+  }
+
+  async function saveProject() {
+    const p_name = document.getElementById('p_name').value.trim();
+    const p_desc = document.getElementById('p_desc').value.trim();
+    const p_status = document.getElementById('p_status').value;
+    const managerSelect = document.getElementById('p_manager');
+    const p_managers = Array.from(managerSelect.selectedOptions).map(o => o.value);
+    const tech_stack_str = document.getElementById('p_tech_stack').value;
+    const tech_stack = tech_stack_str.split(',').map(s=>s.trim()).filter(s=>s);
+
+    if (p_managers.length === 0) {
+      alert("Please select at least one Project Manager.");
+      return;
+    }
+
+    if (!p_name) { alert("Project name is required."); return; }
+
+    // Gather employee data
+    let employees_data = [];
+    const container = document.getElementById('emp_summaries_container');
+    const cards = container.querySelectorAll('.emp-summary-card');
+
+    for (let card of cards) {
+      const summaryBox = card.querySelector('.emp-summary-text');
+      const empid = parseInt(summaryBox.dataset.empid);
+      const role = team.find(t => t.emp_id === empid)?.role || '';
+      const summary = summaryBox.value.trim();
+      
+      const skillRows = card.querySelectorAll('.skill-row');
+      let skills = [];
+      skillRows.forEach(row => {
+        const inputs = row.querySelectorAll('input');
+        const sname = inputs[0].value.trim();
+        const srating = parseFloat(inputs[1].value);
+        if (sname && !isNaN(srating)) {
+          skills.push({ skill_name: sname, rating: srating });
+        }
+      });
+
+      employees_data.push({
+        emp_id: empid,
+        role: role,
+        work_summary: summary,
+        utilization: team.find(t => t.emp_id === empid)?.utilization || 0,
+        skills: skills
+      });
+    }
+
+    const payload = {
+      project_name: p_name,
+      description: p_desc,
+      status: p_status,
+      manager_ids: p_managers,
+      tech_stack: tech_stack,
+      employees: employees_data
+    };
+
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    try {
+      const csrfToken = '{{ csrf_token }}';
+      const res = await fetch("{% url 'records:add_project' %}", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        window.location.href = "/projects/" + data.project_id + "/";
+      } else {
+        alert("Error saving: " + data.error);
+        btn.disabled = false;
+        btn.textContent = '💾 Save Project';
+      }
+    } catch(err) {
+      alert("Request failed: " + err);
+      btn.disabled = false;
+      btn.textContent = '💾 Save Project';
+    }
+  }
+</script>
+{% endblock %}
