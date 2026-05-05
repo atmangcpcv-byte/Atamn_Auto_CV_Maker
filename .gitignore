@@ -1,5 +1,10 @@
 # Environment variables - NEVER commit this
 .env
+
+# Service account keys - NEVER commit these
+*-key.json
+github-key.json
+service-account*.json
 *.env
 
 # Python
