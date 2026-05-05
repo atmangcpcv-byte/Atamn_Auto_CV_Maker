@@ -123,14 +123,12 @@
         <span class="ps-value">{{ certifications.count }}</span>
         <span class="ps-label">Certs</span>
       </div>
-      {% if active_works %}
       <div class="ps-item">
         {% with u=employee.total_utilization|default:0 %}
         <span class="ps-value" style="color:{% if u < 25 %}var(--accent-red){% elif u <= 50 %}#e3a008{% else %}var(--accent-green){% endif %}">{{ u }}%</span>
         {% endwith %}
         <span class="ps-label">Utilization</span>
       </div>
-      {% endif %}
     </div>
 
     <div class="tags" style="margin-top:16px">
@@ -269,7 +267,7 @@
               {{ work.project.status }}
           </span>
           {% endif %}
-          {% if work.utilization and work.project.status == 'Active' %}
+          {% if work.utilization %}
           <span class="badge" style="background:rgba(88,166,255,0.1);border:1px solid rgba(88,166,255,0.3);color:{% if work.utilization < 25 %}var(--accent-red){% elif work.utilization <= 50 %}#e3a008{% else %}var(--accent-green){% endif %};font-weight:700;">⏱ {{ work.utilization }}% time</span>
           {% endif %}
         </div>

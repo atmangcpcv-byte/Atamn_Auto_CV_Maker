@@ -1,7 +1,7 @@
 {% extends "records/base.html" %}
 {% block title %}Add Employee — Office Records{% endblock %}
 {% block page_title %}Add New Employee{% endblock %}
-{% block page_sub %}Fill in the required fields — everything else can be added later{% endblock %}
+{% block page_sub %}All fields are required — fill in the complete employee profile{% endblock %}
 
 {% block topbar_actions %}
 <a href="{% url 'records:employee_list' %}" class="btn btn-secondary">← Back to Employees</a>
@@ -274,16 +274,16 @@
   </div>
   <div class="grid-2">
     <div class="form-group">
-      <label>LinkedIn URL <span style="color:var(--text-muted);font-size:10px;font-weight:400;">(optional)</span></label>
+      <label>LinkedIn URL <span class="req">*</span></label>
       <input type="text" id="emp_linkedin" class="form-control" placeholder="https://linkedin.com/in/...">
     </div>
     <div class="form-group">
-      <label>GitHub / Portfolio URL <span style="color:var(--text-muted);font-size:10px;font-weight:400;">(optional)</span></label>
+      <label>GitHub / Portfolio URL <span class="req">*</span></label>
       <input type="text" id="emp_github" class="form-control" placeholder="https://github.com/...">
     </div>
   </div>
   <div class="form-group">
-    <label>Profile Summary <span style="color:var(--text-muted);font-size:10px;font-weight:400;">(optional — AI can generate from projects)</span></label>
+    <label>Profile Summary <span class="req">*</span></label>
     <textarea id="emp_profile_summary" class="form-control" rows="3" placeholder="A brief professional bio..."></textarea>
   </div>
   <div class="id-hint">🆔 Auto-assigned Employee ID: <strong>{{ next_emp_id }}</strong></div>
@@ -291,7 +291,7 @@
 
 <!-- ── 2. MANAGER ──────────────────────────────────────────────── -->
 <div class="form-section">
-  <div class="form-section-title">🏢 2. Reporting Manager <span style="color:var(--text-muted);font-size:12px;font-weight:400;">(optional)</span></div>
+  <div class="form-section-title">🏢 2. Reporting Manager <span class="req">*</span></div>
   <div class="form-group" style="max-width:460px">
     <label>Search & Select Manager</label>
     <div class="manager-search-wrap" id="managerWrap">
@@ -334,7 +334,7 @@
 
 <!-- ── 4. CERTIFICATIONS ──────────────────────────────────────── -->
 <div class="form-section">
-  <div class="form-section-title">📜 4. Certifications <span style="color:var(--text-muted);font-size:12px;font-weight:400;">(optional)</span></div>
+  <div class="form-section-title">📜 4. Certifications <span class="req">*</span></div>
   <div id="certContainer"></div>
   <button type="button" class="add-row-btn" id="addCertBtn" onclick="addCert()">＋ Add Certification</button>
   <div class="section-error" id="certError">⚠ Add at least one certification.</div>
@@ -342,7 +342,7 @@
 
 <!-- ── 5. PREVIOUS EXPERIENCE ─────────────────────────────────── -->
 <div class="form-section">
-  <div class="form-section-title">💼 5. Previous Experience <span style="color:var(--text-muted);font-size:12px;font-weight:400;">(optional)</span></div>
+  <div class="form-section-title">💼 5. Previous Experience <span class="req">*</span></div>
   <div id="expContainer"></div>
   <button type="button" class="add-row-btn" id="addExpBtn" onclick="addExperience()">＋ Add Experience</button>
   <div class="section-error" id="expError">⚠ Add at least one previous experience with Company and Role filled.</div>
@@ -442,7 +442,7 @@ function addEducation() {
     '<div class="edu-grid-2">' +
       '<div class="form-group" style="margin-bottom:0"><label>Graduation Year <span class="req">*</span></label>' +
         '<input type="number" class="form-control edu-year" placeholder="e.g. 2020" min="1950" max="2099"></div>' +
-      '<div class="form-group" style="margin-bottom:0"><label>CGPA / Percentage <span style="color:var(--text-muted);font-size:10px;font-weight:400;">(optional)</span></label>' +
+      '<div class="form-group" style="margin-bottom:0"><label>CGPA / Percentage <span class="req">*</span></label>' +
         '<input type="number" class="form-control edu-cgpa" placeholder="e.g. 8.7" min="0" max="100" step="0.01"></div>' +
     '</div>';
   container.appendChild(div);
@@ -485,7 +485,7 @@ function addExperience() {
       '<div class="form-group" style="margin-bottom:0"><label>Duration <span class="req">*</span></label>' +
         '<input type="text" class="form-control exp-duration" placeholder="e.g. Jan 2019 – Mar 2021"></div>' +
     '</div>' +
-    '<div class="form-group" style="margin-bottom:0"><label>Description <span style="color:var(--text-muted);font-size:10px;font-weight:400;">(optional)</span></label>' +
+    '<div class="form-group" style="margin-bottom:0"><label>Description <span class="req">*</span></label>' +
       '<textarea class="form-control exp-desc" rows="2" placeholder="Brief summary of responsibilities..."></textarea></div>';
   container.appendChild(div);
   document.getElementById('expError').classList.remove('show');
@@ -550,12 +550,19 @@ async function saveEmployee() {
   if (!markField(desigEl, desigEl.value.trim()))  ok = false;
   if (!markField(expEl,   expEl.value.trim()))    ok = false;
   if (!markField(dateEl,  dateEl.value.trim()))   ok = false;
-  // LinkedIn, GitHub and Profile Summary are optional — no validation
+  if (!markField(liEl,    liEl.value.trim()))     ok = false;
+  if (!markField(ghEl,    ghEl.value.trim()))     ok = false;
+  if (!markField(sumEl,   sumEl.value.trim()))    ok = false;
 
-  /* Manager — optional, no validation needed */
-  document.getElementById('managerError').classList.remove('show');
+  /* Manager */
+  if (!selectedManagerId) {
+    document.getElementById('managerError').classList.add('show');
+    ok = false;
+  } else {
+    document.getElementById('managerError').classList.remove('show');
+  }
 
-  /* Education — at least one row, degree/field/institution/year required, cgpa optional */
+  /* Education — at least one row, all fields filled */
   var eduRows = document.querySelectorAll('#educationContainer .dynamic-row');
   var eduOk = eduRows.length > 0;
   eduRows.forEach(function(row) {
@@ -563,33 +570,37 @@ async function saveEmployee() {
     var f = row.querySelector('.edu-field');
     var i = row.querySelector('.edu-inst');
     var y = row.querySelector('.edu-year');
+    var c = row.querySelector('.edu-cgpa');
     if (!markField(d, d.value.trim())) eduOk = false;
     if (!markField(f, f.value.trim())) eduOk = false;
     if (!markField(i, i.value.trim())) eduOk = false;
     if (!markField(y, y.value.trim())) eduOk = false;
+    if (!markField(c, c.value.trim())) eduOk = false;
   });
   if (!eduOk) { document.getElementById('eduError').classList.add('show'); ok = false; }
   else { document.getElementById('eduError').classList.remove('show'); }
 
-  /* Certifications — optional, but if rows added, name must be filled */
+  /* Certifications — at least one */
   var certInputs = document.querySelectorAll('#certContainer .cert-name');
-  var certOk = true;
+  var certOk = certInputs.length > 0;
   certInputs.forEach(function(inp) {
     if (!markField(inp, inp.value.trim())) certOk = false;
   });
   if (!certOk) { document.getElementById('certError').classList.add('show'); ok = false; }
   else { document.getElementById('certError').classList.remove('show'); }
 
-  /* Experience — optional, but if rows added, company and role must be filled */
+  /* Experience — at least one row, company/role/duration/desc filled */
   var expRows = document.querySelectorAll('#expContainer .dynamic-row');
-  var expSecOk = true;
+  var expSecOk = expRows.length > 0;
   expRows.forEach(function(row) {
     var co = row.querySelector('.exp-company');
     var ro = row.querySelector('.exp-role');
     var du = row.querySelector('.exp-duration');
+    var de = row.querySelector('.exp-desc');
     if (!markField(co, co.value.trim())) expSecOk = false;
     if (!markField(ro, ro.value.trim())) expSecOk = false;
     if (!markField(du, du.value.trim())) expSecOk = false;
+    if (!markField(de, de.value.trim())) expSecOk = false;
   });
   if (!expSecOk) { document.getElementById('expError').classList.add('show'); ok = false; }
   else { document.getElementById('expError').classList.remove('show'); }
