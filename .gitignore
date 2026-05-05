@@ -1,6 +1,9 @@
 # Environment variables - NEVER commit this
 .env
 *.env
+github-key.json
+*-key.json
+*-credentials.json
 
 # Python
 __pycache__/
