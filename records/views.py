@@ -10,6 +10,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.hashers import check_password, make_password
 from django.db.models import Count, Avg, Q, Sum
+from django.conf import settings
+
 from .models import Employee, Project, Skill, Work, EmployeeSkill, Certification, Education, WorkSkillAnalysis, PreviousExperience, ProjectTech
 from google import genai
 from google.genai import types
@@ -855,9 +857,9 @@ def download_resume_view(request, emp_id):
     # Build Docx
     template_type = request.POST.get('template_type', 'general')
     if template_type == 'prof':
-        tpl_path = "C:/Auto_CV_Maker/Resume_template/Resume_Prof.docx"
+        tpl_path = os.path.join(settings.BASE_DIR, 'Resume_template', 'Resume_Prof.docx')
     else:
-        tpl_path = "C:/Auto_CV_Maker/Resume_template/Resume_Dynamic.docx"
+        tpl_path = os.path.join(settings.BASE_DIR, 'Resume_template', 'Resume_Dynamic.docx')
         
     tpl = DocxTemplate(tpl_path)
     
