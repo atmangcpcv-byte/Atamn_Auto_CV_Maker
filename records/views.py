@@ -426,8 +426,8 @@ def update_employee_skill_rating(emp, skill):
 
 
 def recalculate_utilization(emp):
-    """Recompute Employee.total_utilization as the sum of all Work.utilization values."""
-    total = Work.objects.filter(employee=emp).aggregate(s=Sum('utilization'))['s'] or 0
+    """Recompute Employee.total_utilization — only Active projects count towards utilization."""
+    total = Work.objects.filter(employee=emp, project__status='Active').aggregate(s=Sum('utilization'))['s'] or 0
     Employee.objects.filter(emp_id=emp.emp_id).update(total_utilization=round(total, 2))
 
 

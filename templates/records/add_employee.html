@@ -1,7 +1,7 @@
 {% extends "records/base.html" %}
 {% block title %}Add Employee — Office Records{% endblock %}
 {% block page_title %}Add New Employee{% endblock %}
-{% block page_sub %}All fields are required — fill in the complete employee profile{% endblock %}
+{% block page_sub %}Fill in the employee profile — starred sections are required{% endblock %}
 
 {% block topbar_actions %}
 <a href="{% url 'records:employee_list' %}" class="btn btn-secondary">← Back to Employees</a>
@@ -291,7 +291,7 @@
 
 <!-- ── 2. MANAGER ──────────────────────────────────────────────── -->
 <div class="form-section">
-  <div class="form-section-title">🏢 2. Reporting Manager <span class="req">*</span></div>
+  <div class="form-section-title">🏢 2. Reporting Manager <span style="font-size:12px;color:var(--text-muted);font-weight:400;">(optional)</span></div>
   <div class="form-group" style="max-width:460px">
     <label>Search & Select Manager</label>
     <div class="manager-search-wrap" id="managerWrap">
@@ -334,18 +334,18 @@
 
 <!-- ── 4. CERTIFICATIONS ──────────────────────────────────────── -->
 <div class="form-section">
-  <div class="form-section-title">📜 4. Certifications <span class="req">*</span></div>
+  <div class="form-section-title">📜 4. Certifications <span style="font-size:12px;color:var(--text-muted);font-weight:400;">(optional)</span></div>
   <div id="certContainer"></div>
   <button type="button" class="add-row-btn" id="addCertBtn" onclick="addCert()">＋ Add Certification</button>
-  <div class="section-error" id="certError">⚠ Add at least one certification.</div>
+  <div class="section-error" id="certError">⚠ Fill in the certification name for all added entries.</div>
 </div>
 
 <!-- ── 5. PREVIOUS EXPERIENCE ─────────────────────────────────── -->
 <div class="form-section">
-  <div class="form-section-title">💼 5. Previous Experience <span class="req">*</span></div>
+  <div class="form-section-title">💼 5. Previous Experience <span style="font-size:12px;color:var(--text-muted);font-weight:400;">(optional)</span></div>
   <div id="expContainer"></div>
   <button type="button" class="add-row-btn" id="addExpBtn" onclick="addExperience()">＋ Add Experience</button>
-  <div class="section-error" id="expError">⚠ Add at least one previous experience with Company and Role filled.</div>
+  <div class="section-error" id="expError">⚠ Fill in Company and Role for all added experience entries.</div>
 </div>
 
 <!-- ── 6. SKILLS ──────────────────────────────────────────────── -->
@@ -554,15 +554,10 @@ async function saveEmployee() {
   if (!markField(ghEl,    ghEl.value.trim()))     ok = false;
   if (!markField(sumEl,   sumEl.value.trim()))    ok = false;
 
-  /* Manager */
-  if (!selectedManagerId) {
-    document.getElementById('managerError').classList.add('show');
-    ok = false;
-  } else {
-    document.getElementById('managerError').classList.remove('show');
-  }
+  /* Manager — optional, no validation needed */
+  document.getElementById('managerError').classList.remove('show');
 
-  /* Education — at least one row, all fields filled */
+  /* Education — at least one row required, all fields in filled rows must be complete */
   var eduRows = document.querySelectorAll('#educationContainer .dynamic-row');
   var eduOk = eduRows.length > 0;
   eduRows.forEach(function(row) {
@@ -580,18 +575,18 @@ async function saveEmployee() {
   if (!eduOk) { document.getElementById('eduError').classList.add('show'); ok = false; }
   else { document.getElementById('eduError').classList.remove('show'); }
 
-  /* Certifications — at least one */
+  /* Certifications — optional; only validate rows that exist */
   var certInputs = document.querySelectorAll('#certContainer .cert-name');
-  var certOk = certInputs.length > 0;
+  var certOk = true;
   certInputs.forEach(function(inp) {
     if (!markField(inp, inp.value.trim())) certOk = false;
   });
   if (!certOk) { document.getElementById('certError').classList.add('show'); ok = false; }
   else { document.getElementById('certError').classList.remove('show'); }
 
-  /* Experience — at least one row, company/role/duration/desc filled */
+  /* Experience — optional; only validate rows that exist */
   var expRows = document.querySelectorAll('#expContainer .dynamic-row');
-  var expSecOk = expRows.length > 0;
+  var expSecOk = true;
   expRows.forEach(function(row) {
     var co = row.querySelector('.exp-company');
     var ro = row.querySelector('.exp-role');
@@ -605,7 +600,7 @@ async function saveEmployee() {
   if (!expSecOk) { document.getElementById('expError').classList.add('show'); ok = false; }
   else { document.getElementById('expError').classList.remove('show'); }
 
-  /* Skills — at least one row, name + rating filled */
+  /* Skills — at least one row required, name + rating filled */
   var skillRows = document.querySelectorAll('#skillContainer .dynamic-row');
   var skillOk = skillRows.length > 0;
   skillRows.forEach(function(row) {
